@@ -1,0 +1,31 @@
+# Relative to the chassis pose at acceptance. SI units throughout.
+uint8 MOVE_LINEAR=1
+uint8 ROTATE=2
+uint8 motion_type
+float64 target
+# Zero uses the configured default. Positive overrides may only reduce limits.
+float64 max_speed
+float64 timeout_sec
+---
+uint8 SUCCEEDED=0
+uint8 CANCELED=1
+uint8 POSE_INVALID=2
+uint8 TIMEOUT=3
+uint8 NO_PROGRESS=4
+uint8 STOPPED=5
+uint8 INTERNAL_ERROR=6
+uint8 code
+string message
+float64 final_x
+float64 final_y
+float64 final_yaw
+float64 remaining
+float64 elapsed_sec
+---
+string phase
+float64 current_x
+float64 current_y
+float64 current_yaw
+float64 remaining
+float64 cross_track_error
+float64 elapsed_sec
