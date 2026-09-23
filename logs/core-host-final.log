@@ -1,0 +1,21 @@
+test_action_timeout (test_core.ControlTests.test_action_timeout) ... ok
+test_cancel_and_timer_gap (test_core.ControlTests.test_cancel_and_timer_gap) ... ok
+test_duplicate_timestamp_fails (test_core.ControlTests.test_duplicate_timestamp_fails) ... ok
+test_forward_reverse_and_rotated_heading (test_core.ControlTests.test_forward_reverse_and_rotated_heading) ... ok
+test_invalid_configuration_and_goal (test_core.ControlTests.test_invalid_configuration_and_goal) ... ok
+test_jump_fails (test_core.ControlTests.test_jump_fails) ... ok
+test_no_progress (test_core.ControlTests.test_no_progress) ... ok
+test_optional_mecanum_cross_track_correction (test_core.ControlTests.test_optional_mecanum_cross_track_correction) ... ok
+test_overshoot_corrects_direction (test_core.ControlTests.test_overshoot_corrects_direction) ... ok
+test_rotation_direction_and_wrap (test_core.ControlTests.test_rotation_direction_and_wrap) ... ok
+test_speed_and_acceleration_limits (test_core.ControlTests.test_speed_and_acceleration_limits) ... ok
+test_stale_pose_stops_and_requires_new_goal (test_core.ControlTests.test_stale_pose_stops_and_requires_new_goal) ... ok
+test_zero_goal_does_not_finish_on_repeated_timer_samples (test_core.ControlTests.test_zero_goal_does_not_finish_on_repeated_timer_samples) ... ok
+test_invalid_quaternion (test_core.GeometryTests.test_invalid_quaternion) ... ok
+test_mount_rotation_and_lever_arm (test_core.GeometryTests.test_mount_rotation_and_lever_arm) ... ok
+test_translation_is_rotated_in_full_3d (test_core.GeometryTests.test_translation_is_rotated_in_full_3d) ... ok
+
+----------------------------------------------------------------------
+Ran 16 tests in 0.008s
+
+OK

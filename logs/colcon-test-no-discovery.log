@@ -1,0 +1,17 @@
+Starting >>> wheeltec_motion_control
+
+----------------------------------------------------------------------
+Ran 0 tests in 0.000s
+
+OK
+--- stderr: wheeltec_motion_control
+
+----------------------------------------------------------------------
+Ran 0 tests in 0.000s
+
+OK
+---
+Finished <<< wheeltec_motion_control [0.16s]
+
+Summary: 1 package finished [0.29s]
+  1 package had stderr output: wheeltec_motion_control

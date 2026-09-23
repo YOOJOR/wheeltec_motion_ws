@@ -1,0 +1,157 @@
+Starting >>> wheeltec_motion_interfaces
+Consolidate compiler generated dependencies of target wheeltec_motion_interfaces__rosidl_generator_c
+[  6%] Built target wheeltec_motion_interfaces__rs
+[  6%] Built target wheeltec_motion_interfaces__cpp
+[ 15%] Built target wheeltec_motion_interfaces__rosidl_generator_c
+[ 15%] Built target ament_cmake_python_symlink_wheeltec_motion_interfaces
+Consolidate compiler generated dependencies of target wheeltec_motion_interfaces__rosidl_typesupport_cpp
+Consolidate compiler generated dependencies of target wheeltec_motion_interfaces__rosidl_typesupport_introspection_cpp
+Consolidate compiler generated dependencies of target wheeltec_motion_interfaces__rosidl_typesupport_c
+Consolidate compiler generated dependencies of target wheeltec_motion_interfaces__rosidl_typesupport_fastrtps_cpp
+Consolidate compiler generated dependencies of target wheeltec_motion_interfaces__rosidl_typesupport_fastrtps_c
+Consolidate compiler generated dependencies of target wheeltec_motion_interfaces__rosidl_typesupport_introspection_c
+[ 25%] Built target wheeltec_motion_interfaces__rosidl_typesupport_cpp
+[ 34%] Built target wheeltec_motion_interfaces__rosidl_typesupport_introspection_cpp
+[ 43%] Built target wheeltec_motion_interfaces__rosidl_typesupport_fastrtps_c
+[ 71%] Built target wheeltec_motion_interfaces__rosidl_typesupport_introspection_c
+[ 71%] Built target wheeltec_motion_interfaces__rosidl_typesupport_fastrtps_cpp
+[ 71%] Built target wheeltec_motion_interfaces__rosidl_typesupport_c
+[ 71%] Built target wheeltec_motion_interfaces
+[ 75%] Built target wheeltec_motion_interfaces__py
+Consolidate compiler generated dependencies of target wheeltec_motion_interfaces__rosidl_generator_py
+[ 81%] Built target wheeltec_motion_interfaces__rosidl_generator_py
+Consolidate compiler generated dependencies of target wheeltec_motion_interfaces__rosidl_typesupport_introspection_c__pyext
+Consolidate compiler generated dependencies of target wheeltec_motion_interfaces__rosidl_typesupport_c__pyext
+Consolidate compiler generated dependencies of target wheeltec_motion_interfaces__rosidl_typesupport_fastrtps_c__pyext
+[ 87%] Built target wheeltec_motion_interfaces__rosidl_typesupport_fastrtps_c__pyext
+[100%] Built target wheeltec_motion_interfaces__rosidl_typesupport_c__pyext
+[100%] Built target wheeltec_motion_interfaces__rosidl_typesupport_introspection_c__pyext
+running egg_info
+writing wheeltec_motion_interfaces.egg-info/PKG-INFO
+writing dependency_links to wheeltec_motion_interfaces.egg-info/dependency_links.txt
+writing top-level names to wheeltec_motion_interfaces.egg-info/top_level.txt
+reading manifest file 'wheeltec_motion_interfaces.egg-info/SOURCES.txt'
+writing manifest file 'wheeltec_motion_interfaces.egg-info/SOURCES.txt'
+[100%] Built target ament_cmake_python_build_wheeltec_motion_interfaces_egg
+-- Install configuration: ""
+-- Execute custom install script
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/share/ament_index/resource_index/rosidl_interfaces/wheeltec_motion_interfaces
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/include/wheeltec_motion_interfaces/wheeltec_motion_interfaces/action/detail/execute_motion__functions.h
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/include/wheeltec_motion_interfaces/wheeltec_motion_interfaces/action/detail/execute_motion__struct.h
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/include/wheeltec_motion_interfaces/wheeltec_motion_interfaces/action/detail/execute_motion__type_support.h
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/include/wheeltec_motion_interfaces/wheeltec_motion_interfaces/action/execute_motion.h
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/include/wheeltec_motion_interfaces/wheeltec_motion_interfaces/msg/rosidl_generator_c__visibility_control.h
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/environment/library_path.sh
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/environment/library_path.dsv
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/include/wheeltec_motion_interfaces/wheeltec_motion_interfaces/action/detail/execute_motion__rosidl_typesupport_fastrtps_c.h
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/include/wheeltec_motion_interfaces/wheeltec_motion_interfaces/msg/rosidl_typesupport_fastrtps_c__visibility_control.h
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/include/wheeltec_motion_interfaces/wheeltec_motion_interfaces/action/detail/execute_motion__rosidl_typesupport_introspection_c.h
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/include/wheeltec_motion_interfaces/wheeltec_motion_interfaces/msg/rosidl_typesupport_introspection_c__visibility_control.h
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/include/wheeltec_motion_interfaces/wheeltec_motion_interfaces/action/detail/execute_motion__builder.hpp
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/include/wheeltec_motion_interfaces/wheeltec_motion_interfaces/action/detail/execute_motion__struct.hpp
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/include/wheeltec_motion_interfaces/wheeltec_motion_interfaces/action/detail/execute_motion__traits.hpp
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/include/wheeltec_motion_interfaces/wheeltec_motion_interfaces/action/detail/execute_motion__type_support.hpp
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/include/wheeltec_motion_interfaces/wheeltec_motion_interfaces/action/execute_motion.hpp
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/include/wheeltec_motion_interfaces/wheeltec_motion_interfaces/msg/rosidl_generator_cpp__visibility_control.hpp
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/include/wheeltec_motion_interfaces/wheeltec_motion_interfaces/action/detail/execute_motion__rosidl_typesupport_fastrtps_cpp.hpp
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/include/wheeltec_motion_interfaces/wheeltec_motion_interfaces/msg/rosidl_typesupport_fastrtps_cpp__visibility_control.h
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/include/wheeltec_motion_interfaces/wheeltec_motion_interfaces/action/detail/execute_motion__rosidl_typesupport_introspection_cpp.hpp
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/environment/pythonpath.sh
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/environment/pythonpath.dsv
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/local/lib/python3.10/dist-packages/wheeltec_motion_interfaces-0.1.0-py3.10.egg-info/PKG-INFO
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/local/lib/python3.10/dist-packages/wheeltec_motion_interfaces-0.1.0-py3.10.egg-info/SOURCES.txt
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/local/lib/python3.10/dist-packages/wheeltec_motion_interfaces-0.1.0-py3.10.egg-info/dependency_links.txt
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/local/lib/python3.10/dist-packages/wheeltec_motion_interfaces-0.1.0-py3.10.egg-info/top_level.txt
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/local/lib/python3.10/dist-packages/wheeltec_motion_interfaces/__init__.py
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/local/lib/python3.10/dist-packages/wheeltec_motion_interfaces/_wheeltec_motion_interfaces_s.ep.rosidl_typesupport_c.c
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/local/lib/python3.10/dist-packages/wheeltec_motion_interfaces/_wheeltec_motion_interfaces_s.ep.rosidl_typesupport_fastrtps_c.c
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/local/lib/python3.10/dist-packages/wheeltec_motion_interfaces/_wheeltec_motion_interfaces_s.ep.rosidl_typesupport_introspection_c.c
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/local/lib/python3.10/dist-packages/wheeltec_motion_interfaces/action/__init__.py
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/local/lib/python3.10/dist-packages/wheeltec_motion_interfaces/action/_execute_motion.py
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/local/lib/python3.10/dist-packages/wheeltec_motion_interfaces/action/_execute_motion_s.c
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/local/lib/python3.10/dist-packages/wheeltec_motion_interfaces/libwheeltec_motion_interfaces__rosidl_generator_py.so
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/local/lib/python3.10/dist-packages/wheeltec_motion_interfaces/wheeltec_motion_interfaces_s__rosidl_typesupport_c.cpython-310-x86_64-linux-gnu.so
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/local/lib/python3.10/dist-packages/wheeltec_motion_interfaces/wheeltec_motion_interfaces_s__rosidl_typesupport_fastrtps_c.cpython-310-x86_64-linux-gnu.so
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/local/lib/python3.10/dist-packages/wheeltec_motion_interfaces/wheeltec_motion_interfaces_s__rosidl_typesupport_introspection_c.cpython-310-x86_64-linux-gnu.so
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/local/lib/python3.10/dist-packages/wheeltec_motion_interfaces/wheeltec_motion_interfaces_s__rosidl_typesupport_fastrtps_c.cpython-310-x86_64-linux-gnu.so
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/local/lib/python3.10/dist-packages/wheeltec_motion_interfaces/wheeltec_motion_interfaces_s__rosidl_typesupport_introspection_c.cpython-310-x86_64-linux-gnu.so
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/local/lib/python3.10/dist-packages/wheeltec_motion_interfaces/wheeltec_motion_interfaces_s__rosidl_typesupport_c.cpython-310-x86_64-linux-gnu.so
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/share/ament_index/resource_index/rust_packages/wheeltec_motion_interfaces
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/rust/Cargo.toml
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/rust/build.rs
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/rust/src/action.rs
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/rust/src/action/rmw.rs
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/rust/src/lib.rs
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/action/ExecuteMotion.idl
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/action/ExecuteMotion.action
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/share/ament_index/resource_index/package_run_dependencies/wheeltec_motion_interfaces
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/share/ament_index/resource_index/parent_prefix_path/wheeltec_motion_interfaces
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/environment/ament_prefix_path.sh
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/environment/ament_prefix_path.dsv
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/environment/path.sh
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/environment/path.dsv
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/local_setup.bash
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/local_setup.sh
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/local_setup.zsh
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/local_setup.dsv
+-- Symlinking: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/package.dsv
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/share/ament_index/resource_index/packages/wheeltec_motion_interfaces
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/cmake/rosidl_cmake-extras.cmake
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/cmake/ament_cmake_export_dependencies-extras.cmake
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/cmake/ament_cmake_export_include_directories-extras.cmake
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/cmake/ament_cmake_export_libraries-extras.cmake
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/cmake/ament_cmake_export_targets-extras.cmake
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/cmake/rosidl_cmake_export_typesupport_targets-extras.cmake
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/cmake/rosidl_cmake_export_typesupport_libraries-extras.cmake
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/cmake/rosidl_cmake_aggregate_target-extras.cmake
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/cmake/wheeltec_motion_interfacesConfig.cmake
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/cmake/wheeltec_motion_interfacesConfig-version.cmake
+-- Up-to-date symlink: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/package.xml
+-- Up-to-date: /ws/install/wheeltec_motion_interfaces/lib/libwheeltec_motion_interfaces__rosidl_generator_c.so
+-- Up-to-date: /ws/install/wheeltec_motion_interfaces/lib/libwheeltec_motion_interfaces__rosidl_typesupport_fastrtps_c.so
+-- Up-to-date: /ws/install/wheeltec_motion_interfaces/lib/libwheeltec_motion_interfaces__rosidl_typesupport_introspection_c.so
+-- Up-to-date: /ws/install/wheeltec_motion_interfaces/lib/libwheeltec_motion_interfaces__rosidl_typesupport_c.so
+-- Up-to-date: /ws/install/wheeltec_motion_interfaces/lib/libwheeltec_motion_interfaces__rosidl_typesupport_fastrtps_cpp.so
+-- Up-to-date: /ws/install/wheeltec_motion_interfaces/lib/libwheeltec_motion_interfaces__rosidl_typesupport_introspection_cpp.so
+-- Up-to-date: /ws/install/wheeltec_motion_interfaces/lib/libwheeltec_motion_interfaces__rosidl_typesupport_cpp.so
+Listing '/ws/install/wheeltec_motion_interfaces/local/lib/python3.10/dist-packages/wheeltec_motion_interfaces'...
+Listing '/ws/install/wheeltec_motion_interfaces/local/lib/python3.10/dist-packages/wheeltec_motion_interfaces/action'...
+-- Up-to-date: /ws/install/wheeltec_motion_interfaces/lib/libwheeltec_motion_interfaces__rosidl_generator_py.so
+-- Up-to-date: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/cmake/export_wheeltec_motion_interfaces__rosidl_generator_cExport.cmake
+-- Up-to-date: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/cmake/export_wheeltec_motion_interfaces__rosidl_generator_cExport-noconfig.cmake
+-- Up-to-date: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/cmake/export_wheeltec_motion_interfaces__rosidl_typesupport_fastrtps_cExport.cmake
+-- Up-to-date: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/cmake/export_wheeltec_motion_interfaces__rosidl_typesupport_fastrtps_cExport-noconfig.cmake
+-- Up-to-date: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/cmake/wheeltec_motion_interfaces__rosidl_typesupport_introspection_cExport.cmake
+-- Up-to-date: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/cmake/wheeltec_motion_interfaces__rosidl_typesupport_introspection_cExport-noconfig.cmake
+-- Up-to-date: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/cmake/wheeltec_motion_interfaces__rosidl_typesupport_cExport.cmake
+-- Up-to-date: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/cmake/wheeltec_motion_interfaces__rosidl_typesupport_cExport-noconfig.cmake
+-- Up-to-date: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/cmake/export_wheeltec_motion_interfaces__rosidl_generator_cppExport.cmake
+-- Up-to-date: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/cmake/export_wheeltec_motion_interfaces__rosidl_typesupport_fastrtps_cppExport.cmake
+-- Up-to-date: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/cmake/export_wheeltec_motion_interfaces__rosidl_typesupport_fastrtps_cppExport-noconfig.cmake
+-- Up-to-date: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/cmake/wheeltec_motion_interfaces__rosidl_typesupport_introspection_cppExport.cmake
+-- Up-to-date: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/cmake/wheeltec_motion_interfaces__rosidl_typesupport_introspection_cppExport-noconfig.cmake
+-- Up-to-date: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/cmake/wheeltec_motion_interfaces__rosidl_typesupport_cppExport.cmake
+-- Up-to-date: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/cmake/wheeltec_motion_interfaces__rosidl_typesupport_cppExport-noconfig.cmake
+-- Up-to-date: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/cmake/export_wheeltec_motion_interfaces__rosidl_generator_pyExport.cmake
+-- Up-to-date: /ws/install/wheeltec_motion_interfaces/share/wheeltec_motion_interfaces/cmake/export_wheeltec_motion_interfaces__rosidl_generator_pyExport-noconfig.cmake
+Finished <<< wheeltec_motion_interfaces [0.28s]
+Starting >>> wheeltec_motion_control
+running develop
+running egg_info
+writing wheeltec_motion_control.egg-info/PKG-INFO
+writing dependency_links to wheeltec_motion_control.egg-info/dependency_links.txt
+writing entry points to wheeltec_motion_control.egg-info/entry_points.txt
+writing requirements to wheeltec_motion_control.egg-info/requires.txt
+writing top-level names to wheeltec_motion_control.egg-info/top_level.txt
+reading manifest file 'wheeltec_motion_control.egg-info/SOURCES.txt'
+writing manifest file 'wheeltec_motion_control.egg-info/SOURCES.txt'
+running build_ext
+Creating /ws/install/wheeltec_motion_control/lib/python3.10/site-packages/wheeltec-motion-control.egg-link (link to .)
+Installing motion_client script to /ws/install/wheeltec_motion_control/lib/wheeltec_motion_control
+Installing motion_controller script to /ws/install/wheeltec_motion_control/lib/wheeltec_motion_control
+
+Installed /ws/build/wheeltec_motion_control
+running symlink_data
+Finished <<< wheeltec_motion_control [0.58s]
+
+Summary: 2 packages finished [0.97s]

@@ -1,0 +1,46 @@
+wheeltec_motion_controller:
+  ros__parameters:
+    # 默认不向底盘发任何速度。实车外参配置完毕后再将下面两项设为 true。
+    control_enabled: false
+    extrinsics_calibrated: false
+    odom_topic: /Odometry
+    cmd_vel_topic: /cmd_vel
+    action_name: /wheeltec_motion/execute
+    stop_service: /wheeltec_motion/stop
+    world_frame: camera_init
+    body_frame: body
+    # T_body_base: 底盘参考点在 IMU/body 中的位置(m)，及底盘轴转到 body 轴的 RPY(rad)。
+    # 以下为占位值，不能当作已测量外参。base 选定为实际底盘控制参考点。
+    body_from_base_translation: [0.0, 0.0, 0.0]
+    body_from_base_rpy: [0.0, 0.0, 0.0]
+
+    control_rate_hz: 20.0
+    feedback_rate_hz: 5.0
+    max_linear_speed: 0.15          # m/s；x 轴
+    max_lateral_speed: 0.05         # m/s；y 轴，启用横移纠偏才使用
+    max_angular_speed: 0.35         # rad/s
+    linear_accel: 0.15             # m/s²，各平移轴；主动停止直接发布零速度
+    angular_accel: 0.5             # rad/s²
+    distance_gain: 0.8             # 1/s
+    heading_gain: 1.5              # 1/s
+    lateral_gain: 0.6              # 1/s
+    rotation_gain: 1.2             # 1/s
+    lateral_correction: false      # 基本直行通过后再启用麦轮横向纠偏
+    distance_tolerance: 0.03       # m
+    cross_track_tolerance: 0.05    # m
+    angle_tolerance: 0.035         # rad，约 2 度
+    settle_time: 0.4               # s，需要持续收到新的合格位姿
+    stopped_linear_speed: 0.025    # m/s，用相邻位姿估计，仅为静止判据
+    stopped_angular_speed: 0.04    # rad/s
+    pose_timeout: 0.5              # s，位姿过期判断，非物理停车时限
+    future_stamp_tolerance: 0.1    # s，实车多机时钟需同步
+    max_position_jump: 0.5        # m，相邻底盘位姿允许最大位移
+    max_yaw_jump: 0.8             # rad，相邻姿态允许最大变化，必须小于 pi
+    default_timeout: 45.0          # s，单个动作
+    max_timeout: 180.0             # s，允许单动作请求覆盖到的最大超时
+    no_progress_timeout: 5.0      # s，无可测进展则结束动作
+    linear_progress_epsilon: 0.005 # m
+    angular_progress_epsilon: 0.01 # rad
+    max_distance: 5.0              # m，单动作绝对距离上限
+    max_rotation: 6.283185307179586 # rad，单动作绝对转角上限
+    max_control_gap: 0.3           # s，控制调度间隔超限则结束动作

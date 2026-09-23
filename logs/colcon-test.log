@@ -1,0 +1,16 @@
+Starting >>> wheeltec_motion_control
+============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-6.2.5, py-1.10.0, pluggy-0.13.0
+cachedir: /ws/build/wheeltec_motion_control/.pytest_cache
+rootdir: /ws/src/wheeltec_motion_control, configfile: setup.cfg, testpaths: test
+plugins: ament-copyright-0.12.15, ament-flake8-0.12.15, ament-lint-0.12.15, ament-pep257-0.12.15, ament-xmllint-0.12.15, launch-testing-1.0.14, launch-testing-ros-0.19.14, colcon-core-0.21.1
+collected 22 items
+
+test/test_core.py ................                                       [ 72%]
+test/test_ros_integration.py ......                                      [100%]
+
+------- generated xml file: /ws/build/wheeltec_motion_control/pytest.xml -------
+============================= 22 passed in 11.74s ==============================
+Finished <<< wheeltec_motion_control [12.2s]
+
+Summary: 1 package finished [12.3s]

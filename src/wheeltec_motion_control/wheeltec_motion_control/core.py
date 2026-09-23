@@ -230,7 +230,7 @@ class Controller:
             return self.finish(POSE_INVALID, self.pose_error or 'pose timeout')
         dt = now-self.last_tick
         self.last_tick = now
-        if dt < 0 or dt > c.max_control_gap:
+        if dt < 0 or dt > c.max_control_gap+1e-9:
             return self.finish(INTERNAL_ERROR, 'control loop timing gap')
         if now-self.started >= (g.timeout or c.default_timeout):
             return self.finish(TIMEOUT, 'action timeout')
