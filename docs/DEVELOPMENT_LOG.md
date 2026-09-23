@@ -59,3 +59,9 @@
 - 本阶段成果将提交为 `feat: add configurable FAST-LIO motion action server and verified Humble tests`，并以 `v0.1.0` 标记；精确提交哈希由 Git 历史查询。
 - 所有新增源文件、参数、说明、开发日志及编译/测试输出纳入该独立仓库；编译缓存不纳入。
 - 没有启动实车、没有连接串口、没有更改厂商代码或固件，也没有上传仓库。未来实车参数、试验结果应继续追加日志并提交。
+
+### 版本与可复现信息归档
+- 初版实现提交 b4d2610，版本标签 v0.1.0；初始核心提交 fad9010。
+- 使用 `podman image inspect` 记录镜像 ID 与仓库摘要到 logs/container-image.txt，便于固定同一编译环境。
+- 最后的 git diff --check 只报告原始工具日志自身的行尾空格/结尾空行，源代码无此问题。为保留日志原文，添加 .gitattributes 对 logs/** 禁用空白检查，而不重写原始输出。
+- 本次归档仅修改日志/版本属性，不改已测试代码；不重复运行已通过的测试。
