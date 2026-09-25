@@ -65,3 +65,13 @@
 - 使用 `podman image inspect` 记录镜像 ID 与仓库摘要到 logs/container-image.txt，便于固定同一编译环境。
 - 最后的 git diff --check 只报告原始工具日志自身的行尾空格/结尾空行，源代码无此问题。为保留日志原文，添加 .gitattributes 对 logs/** 禁用空白检查，而不重写原始输出。
 - 本次归档仅修改日志/版本属性，不改已测试代码；不重复运行已通过的测试。
+
+## 2026-09-25 GitHub SSH 身份验证配置（本机完成，账号端待添加）
+
+- 用户请求配置 GitHub 身份验证。检查本机无 gh、无 SSH 密钥文件；SSH 代理无 identities。本仓库没有远端。
+- SSH 代理检查首次受沙箱限制，按权限流程后成功检查。
+- 创建专用 Ed25519 密钥 ~/.ssh/id_ed25519_github（无额外口令），私钥权限 600；只显示公钥，没有读取或记录私钥内容。未覆盖已有密钥。
+- 新建 ~/.ssh/config，仅对 github.com 指定该 IdentityFile、User git、IdentitiesOnly yes，权限 600；ssh -G 已确认配置生效。
+- 公钥指纹 SHA256:4l75t0ok4HfRXYsJdhWoyLwPlQSdfPqxdX4mAUmbksI。密钥文件均在工作空间之外，不纳入 Git。
+- 已打开 https://github.com/settings/ssh/new，页面重定向至 GitHub 登录页。需要用户登录并添加公钥；账号端尚未完成，不能标记认证成功。
+- 用户添加后需执行 ssh -T git@github.com 验证，并核对官方主机指纹；没有创建远端仓库或推送代码。
