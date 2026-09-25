@@ -75,3 +75,4 @@
 - 公钥指纹 SHA256:4l75t0ok4HfRXYsJdhWoyLwPlQSdfPqxdX4mAUmbksI。密钥文件均在工作空间之外，不纳入 Git。
 - 已打开 https://github.com/settings/ssh/new，页面重定向至 GitHub 登录页。需要用户登录并添加公钥；账号端尚未完成，不能标记认证成功。
 - 用户添加后需执行 ssh -T git@github.com 验证，并核对官方主机指纹；没有创建远端仓库或推送代码。
+- 补记：ssh -G 在沙箱内首次报告系统 ssh_config 文件权限问题；在正常主机权限下重试成功，确认 hostname=github.com、user=git、identitiesonly=yes、identityfile=~/.ssh/id_ed25519_github。没有修改系统 SSH 配置。用户已有未跟踪的 src/.vscode/ 保持不动。
