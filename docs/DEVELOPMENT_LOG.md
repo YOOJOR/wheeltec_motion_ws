@@ -76,3 +76,21 @@
 - 已打开 https://github.com/settings/ssh/new，页面重定向至 GitHub 登录页。需要用户登录并添加公钥；账号端尚未完成，不能标记认证成功。
 - 用户添加后需执行 ssh -T git@github.com 验证，并核对官方主机指纹；没有创建远端仓库或推送代码。
 - 补记：ssh -G 在沙箱内首次报告系统 ssh_config 文件权限问题；在正常主机权限下重试成功，确认 hostname=github.com、user=git、identitiesonly=yes、identityfile=~/.ssh/id_ed25519_github。没有修改系统 SSH 配置。用户已有未跟踪的 src/.vscode/ 保持不动。
+
+## 2026-09-25 离线旋转外参辅助标定工具
+
+- 用户授权开发：读取 FAST-LIO /Odometry 录包，计算 IMU 到底盘有效旋转中心的水平偏移，输出轨迹与残差；不修改控制器/STM32，不自动应用参数。
+- 新增 calibration.py，支持 rosbag2/sqlite3 与标准 CSV；以每段独立固定旋转中心拟合 p_i + R_i t = c；左右转分别计算与交叉比较。
+- Z 不估计：未提供时仅报告 Z=0 条件下的 X/Y；倾斜安装且高度未知则质量检查不通过。只有提供 body_z 且检查通过才输出禁用控制、标定未确认的 YAML 建议片段。
+- 参数化采样数、转角覆盖、转速、时间间隔、跳变、条件数、残差与左右差异阈值；拒绝覆盖现有输出目录。
+- 检查 Humble 容器依赖：numpy、rosbag2_py 已有，matplotlib 缺失。建立临时 wheeltec-calibration-check 容器，通过系统官方包仓库安装 python3-matplotlib（日志 calibration-dependencies.log），主机环境不变。
+- 新增合成真值、噪声、倾斜、漂移、反向不一致、无观测/无效数据，以及真实 rosbag2 写入/读取/图表/报告端到端测试。
+- 首轮编译通过，29 项测试中 28 通过、1 失败（logs/calibration-test-first.log）。失败为合成漂移数据每段重新从原点开始，产生 0.4 m 突变，触发预期的跳变拒绝而未进入残差检查；修正测试生成器为跨段连续漂移，保留原跳变保护。
+- 控制包版本更新 0.2.0；接口包保持 0.1.0（消息定义未变化）。
+- 修正数据后真实 Humble 全部 29 项测试通过（新增 7 项标定测试，原 22 项回归），两个包编译成功。保留日志及 XML。
+- 安装后的 calibrate_rotation --help 已验证；合成噪声示例真值 [-0.2, 0.03, -0.4]，输出约 [-0.1998121, 0.0300212, -0.4]，左右差约 0.0003603 m。这只验证算法，不代表实车精度。
+- 已生成并目视检查两栏轨迹/残差图，布局清晰，图与示例报告保存 logs/calibration-synthetic-example.*。
+- README 更新测试镜像构建方式，新增 scripts/Containerfile 安装 matplotlib；既有基础镜像没有绘图库，不能直接跑新增绘图测试。
+- 测试结束后移除本次专用临时容器 wheeltec-calibration-check，工作空间内输出保留。未连接机器人、未改动控制算法/固件、未应用任何外参、未推送远端。
+- 本次作为 v0.2.0 提交并打标签；精确提交号以 Git 历史为准。
+- 提交前空白检查发现测试文件多余尾部空行，已移除；只影响格式，无需重跑算法测试。提交命令因该检查未执行，随后校正本次尚未发布的 v0.2.0 本地标签到实际提交。

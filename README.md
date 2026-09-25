@@ -1,8 +1,8 @@
 # WHEELTEC FAST-LIO 闭环控制工作空间
 
-版本：0.1.0（Git 标签 v0.1.0）。ROS 2 Humble / Ubuntu 22.04 / Python 3.10。
+版本：0.2.0（Git 标签 v0.2.0）。ROS 2 Humble / Ubuntu 22.04 / Python 3.10。
 
-已验证：两包编译成功；22 项测试全部通过；安装后的启动文件、CLI 和正常退出检查通过。详细结果见 logs/colcon-test-result.log。
+已验证：两包编译成功；29 项测试全部通过；安装后的启动文件、CLI 和正常退出检查通过。详细结果见 logs/calibration-test-result.log。
 
 本工作空间包含两个新增包：`wheeltec_motion_interfaces`（动作消息）和 `wheeltec_motion_control`（Python 控制器、客户端）。只复用现有 `/cmd_vel → turn_on_wheeltec_robot → STM32` 链路，不修改固件或厂商驱动。定位使用 FAST-LIO `/Odometry`，本包不发布 TF。
 
@@ -33,9 +33,11 @@ source install/setup.bash
 Fedora 开发机可以使用已下载的官方容器镜像，从本目录执行：
 
 ```bash
+podman build -t wheeltec-motion-test:humble -f scripts/Containerfile scripts
+
 podman run --rm --network=none --security-opt label=disable \
   -e ROS_DOMAIN_ID=173 -e ROS_LOCALHOST_ONLY=1 \
-  -v "$PWD:/ws" -w /ws ros:humble-ros-base-jammy \
+  -v "$PWD:/ws" -w /ws wheeltec-motion-test:humble \
   bash scripts/build_and_test.sh
 ```
 
@@ -137,3 +139,7 @@ ros2 param set /wheeltec_motion_controller rotation_gain 1.0
 电脑测试覆盖几何外参、前后直行、转向跨界/多圈方向、横移纠偏、限速和加速度、过冲、位姿丢失/跳变/重复时间戳、无进展、超时、停止和取消；ROS 集成测试使用真实 Humble Action/Topic/Service 和合成底盘。
 
 实车由用户完成：测外参；0.2 m/15°确认方向；1 m、左右90°各5次记录误差；再测动作序列。建议工程目标为位置误差 ≤10 cm、转角误差 ≤5°，尚未实测。保留定位、cmd_vel、动作结果和外部测量，不以 FAST-LIO 自身输出作为唯一真值。
+
+## 离线旋转外参辅助标定
+
+新增 `calibrate_rotation`：记录 FAST-LIO 位姿后离线计算水平偏移，输出左右转交叉验证、轨迹图和残差；不自动改配置，高度需单独测量。完整命令与结果解释见 [标定工具说明](docs/CALIBRATION.md)。

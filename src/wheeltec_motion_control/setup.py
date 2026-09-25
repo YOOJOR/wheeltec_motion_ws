@@ -2,7 +2,7 @@ from glob import glob
 from setuptools import find_packages, setup
 
 setup(
-    name='wheeltec_motion_control', version='0.1.0',
+    name='wheeltec_motion_control', version='0.2.0',
     packages=find_packages(exclude=['test']),
     data_files=[
         ('share/ament_index/resource_index/packages', ['resource/wheeltec_motion_control']),
@@ -16,5 +16,6 @@ setup(
     entry_points={'console_scripts': [
         'motion_controller = wheeltec_motion_control.node:main',
         'motion_client = wheeltec_motion_control.client:main',
+        'calibrate_rotation = wheeltec_motion_control.calibration:main',
     ]},
 )

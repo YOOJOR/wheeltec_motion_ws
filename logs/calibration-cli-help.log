@@ -1,0 +1,42 @@
+usage: calibrate_rotation [-h] (--bag BAG | --csv CSV) --output OUTPUT
+                          [--topic TOPIC] [--world-frame WORLD_FRAME]
+                          [--body-frame BODY_FRAME] [--storage-id STORAGE_ID]
+                          [--no-plot] [--start-sec START_SEC]
+                          [--end-sec END_SEC] [--min-samples MIN_SAMPLES]
+                          [--min-angle-deg MIN_ANGLE_DEG]
+                          [--min-rate MIN_RATE] [--max-gap MAX_GAP]
+                          [--max-jump MAX_JUMP]
+                          [--max-condition MAX_CONDITION] [--max-rms MAX_RMS]
+                          [--max-p95 MAX_P95]
+                          [--max-direction-difference MAX_DIRECTION_DIFFERENCE]
+                          [--max-axis-variation-deg MAX_AXIS_VARIATION_DEG]
+                          [--level-tolerance-deg LEVEL_TOLERANCE_DEG]
+                          [--body-z BODY_Z]
+
+Offline fixed-centre calibration. Never creates a ROS node or publishes
+motion.
+
+options:
+  -h, --help            show this help message and exit
+  --bag BAG
+  --csv CSV
+  --output OUTPUT       new output directory
+  --topic TOPIC
+  --world-frame WORLD_FRAME
+  --body-frame BODY_FRAME
+  --storage-id STORAGE_ID
+  --no-plot
+  --start-sec START_SEC
+  --end-sec END_SEC
+  --min-samples MIN_SAMPLES
+  --min-angle-deg MIN_ANGLE_DEG
+  --min-rate MIN_RATE
+  --max-gap MAX_GAP
+  --max-jump MAX_JUMP
+  --max-condition MAX_CONDITION
+  --max-rms MAX_RMS
+  --max-p95 MAX_P95
+  --max-direction-difference MAX_DIRECTION_DIFFERENCE
+  --max-axis-variation-deg MAX_AXIS_VARIATION_DEG
+  --level-tolerance-deg LEVEL_TOLERANCE_DEG
+  --body-z BODY_Z
