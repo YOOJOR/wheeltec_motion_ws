@@ -1,0 +1,12 @@
+{
+  "quality_passed": true,
+  "translation_conditioned_on_body_z": [
+    -0.10792124614804675,
+    -0.02335029346145572,
+    0.0
+  ],
+  "body_z_measured": false,
+  "left_right_difference_m": 0.004319327476709376,
+  "reasons": []
+}
+Report: /ws/analysis/20260925-rotation/with-plot/report.md

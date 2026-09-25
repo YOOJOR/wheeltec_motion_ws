@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "samples": 227,
+  "used_samples": 205,
+  "options": {
+    "min_samples": 30,
+    "min_angle_deg": 180.0,
+    "min_rate": 0.03,
+    "max_gap": 0.5,
+    "max_jump": 0.3,
+    "max_condition": 20.0,
+    "max_rms": 0.03,
+    "max_p95": 0.06,
+    "max_direction_difference": 0.03,
+    "max_axis_variation_deg": 5.0,
+    "level_tolerance_deg": 2.0,
+    "body_z": null
+  },
+  "translation_conditioned_on_body_z": [
+    -0.10792124614804675,
+    -0.02335029346145572,
+    0.0
+  ],
+  "body_z_measured": false,
+  "rotation_axis_in_body": [
+    -0.004741554131342796,
+    -0.004244278042381998,
+    0.999979751679162
+  ],
+  "imu_z_axis_tilt_deg": 0.3646136051971699,
+  "axis_variation_deg": 0.7658678297523663,
+  "left_right_difference_m": 0.004319327476709376,
+  "segment_spread_m": 0.002159663738354688,
+  "quality_passed": true,
+  "reasons": [],
+  "segments": [
+    {
+      "translation": [
+        -0.10768052523204204,
+        -0.02549649962661367,
+        0.0
+      ],
+      "centre": [
+        -0.11550819085984512,
+        -0.04354761547430159,
+        -0.07002822854887229
+      ],
+      "rms": 0.008902746913259901,
+      "p95": 0.01498248124216504,
+      "maximum": 0.024117214189949224,
+      "condition": 1.0000188455483006,
+      "unconstrained_singular_values": [
+        9.854992525320737,
+        9.854991419440468,
+        0.029639140550645045
+      ],
+      "start_index": 0,
+      "end_index": 100,
+      "samples": 100,
+      "direction": "left",
+      "angle_deg": 404.3246246616378,
+      "start_sec": 0.0,
+      "end_sec": 9.899020671844482,
+      "common_rms": 0.00915361544746289,
+      "common_p95": 0.015386041507231335
+    },
+    {
+      "translation": [
+        -0.10816196706405147,
+        -0.021204087296297768,
+        0.0
+      ],
+      "centre": [
+        -0.10318348336577383,
+        -0.05258714177022784,
+        -0.07721346931508374
+      ],
+      "rms": 0.010324962396909608,
+      "p95": 0.017240789307176395,
+      "maximum": 0.029581959936454127,
+      "condition": 1.0000175045998658,
+      "unconstrained_singular_values": [
+        10.045522696595752,
+        10.045522033959806,
+        0.021762724076294586
+      ],
+      "start_index": 110,
+      "end_index": 215,
+      "samples": 105,
+      "direction": "right",
+      "angle_deg": 418.1506710907729,
+      "start_sec": 10.999074697494507,
+      "end_sec": 21.399159908294678,
+      "common_rms": 0.01053979799634043,
+      "common_p95": 0.017683506767951395
+    }
+  ],
+  "limitations": [
+    "Z is externally supplied or fixed to zero, never estimated.",
+    "Rotation RPY is not calibrated by this tool.",
+    "A fixed effective rotation centre is assumed; low residual does not prove ground truth.",
+    "With unknown Z, X/Y are conditional on Z=0; tilted mounting couples all components."
+  ],
+  "input": "/ws/analysis/20260925-rotation/default/poses.csv",
+  "pose_data_sha256": "09362dd70fe42d1a4a32c4505b81b8abfe86551029b71e00d6eef15a84cce645",
+  "command": "{'bag': None, 'csv': PosixPath('/ws/analysis/20260925-rotation/default/poses.csv'), 'output': PosixPath('/ws/analysis/20260925-rotation/with-plot'), 'topic': '/Odometry', 'world_frame': 'camera_init', 'body_frame': 'body', 'storage_id': 'sqlite3', 'no_plot': False, 'start_sec': 0.0, 'end_sec': None, 'min_samples': 30, 'min_angle_deg': 180.0, 'min_rate': 0.03, 'max_gap': 0.5, 'max_jump': 0.3, 'max_condition': 20.0, 'max_rms': 0.03, 'max_p95': 0.06, 'max_direction_difference': 0.03, 'max_axis_variation_deg': 5.0, 'level_tolerance_deg': 2.0, 'body_z': None}"
+}
