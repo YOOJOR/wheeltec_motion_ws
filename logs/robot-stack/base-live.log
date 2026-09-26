@@ -1,0 +1,18 @@
+[INFO] [launch]: All log files can be found below /home/wheeltec/workspace/wheeltec_motion_ws/runtime_logs/robot_stack/20260926-214333-15624/ros/2026-09-26-21-43-34-775550-wheeltec-15676
+[INFO] [launch]: Default logging verbosity is set to INFO
+imu_mode:stm32
+ultrasonic_avoid:False
+[INFO] [wheeltec_robot_node-1]: process started with pid [15677]
+[wheeltec_robot_node-1] [INFO] [1790430214.944311912] [wheeltec_robot]: wheeltec_robot Data ready
+[wheeltec_robot_node-1] [INFO] [1790430214.946513430] [wheeltec_robot]: wheeltec_robot serial port opened
+[wheeltec_robot_node-1] [INFO] [1790430492.238210493] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[wheeltec_robot_node-1] [ERROR] [1790430492.253597593] [wheeltec_robot]: unexpectedly failed whith failed to create guard condition: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/guard_condition.c:67
+[wheeltec_robot_node-1] [INFO] [1790430492.256266263] [wheeltec_robot]: Shutting down
+[INFO] [wheeltec_robot_node-1]: process has finished cleanly [pid 15677]
+[INFO] [launch]: All log files can be found below /home/wheeltec/workspace/wheeltec_motion_ws/runtime_logs/robot_stack/20260926-214333-15624/ros/2026-09-26-21-48-16-643998-wheeltec-16967
+[INFO] [launch]: Default logging verbosity is set to INFO
+imu_mode:stm32
+ultrasonic_avoid:False
+[INFO] [wheeltec_robot_node-1]: process started with pid [16977]
+[wheeltec_robot_node-1] [INFO] [1790430496.836939340] [wheeltec_robot]: wheeltec_robot Data ready
+[wheeltec_robot_node-1] [INFO] [1790430496.839299871] [wheeltec_robot]: wheeltec_robot serial port opened

@@ -1,0 +1,54 @@
+2026-09-26 21:43:33,594 INFO Log directory: /home/wheeltec/workspace/wheeltec_motion_ws/runtime_logs/robot_stack/20260926-214333-15624
+2026-09-26 21:43:34,175 INFO START base pid=15676 argv=['ros2', 'launch', 'turn_on_wheeltec_robot', 'base_serial.launch.py']
+2026-09-26 21:43:35,580 INFO READY base
+2026-09-26 21:43:35,582 INFO START livox pid=15689 argv=['ros2', 'launch', 'livox_ros_driver2', 'msg_MID360s_launch.py']
+2026-09-26 21:43:39,595 INFO READY livox
+2026-09-26 21:43:39,597 INFO START fastlio pid=15727 argv=['ros2', 'launch', 'fast_lio', 'mapping.launch.py', 'config_file:=mid360.yaml', 'rviz:=false']
+2026-09-26 21:44:24,740 WARNING RECOVER fastlio: startup readiness timeout: source timestamp age=1.345s; old actions will not resume
+2026-09-26 21:44:24,892 INFO STOP fastlio exit=0
+2026-09-26 21:44:27,903 INFO START fastlio pid=15926 argv=['ros2', 'launch', 'fast_lio', 'mapping.launch.py', 'config_file:=mid360.yaml', 'rviz:=false']
+2026-09-26 21:44:32,114 INFO READY fastlio
+2026-09-26 21:44:32,116 INFO START motion pid=15956 argv=['ros2', 'launch', 'wheeltec_motion_control', 'motion_control.launch.py', 'params_file:=/home/wheeltec/workspace/wheeltec_motion_ws/src/wheeltec_motion_control/config/motion_control.yaml']
+2026-09-26 21:44:34,726 INFO READY motion
+2026-09-26 21:44:34,726 INFO STACK READY: accepting NEW motion goals; no goal was sent
+2026-09-26 21:46:24,751 WARNING RECOVER motion: process exited; old actions will not resume
+2026-09-26 21:46:24,752 INFO STOP motion exit=0
+2026-09-26 21:46:27,762 INFO START motion pid=16435 argv=['ros2', 'launch', 'wheeltec_motion_control', 'motion_control.launch.py', 'params_file:=/home/wheeltec/workspace/wheeltec_motion_ws/src/wheeltec_motion_control/config/motion_control.yaml']
+2026-09-26 21:46:44,467 INFO READY motion
+2026-09-26 21:46:44,467 INFO STACK READY: accepting NEW motion goals; no goal was sent
+2026-09-26 21:46:46,478 WARNING RECOVER fastlio: process exited; old actions will not resume
+2026-09-26 21:46:46,880 INFO STOP motion exit=0
+2026-09-26 21:46:46,881 INFO STOP fastlio exit=0
+2026-09-26 21:46:49,891 INFO START fastlio pid=16536 argv=['ros2', 'launch', 'fast_lio', 'mapping.launch.py', 'config_file:=mid360.yaml', 'rviz:=false']
+2026-09-26 21:46:53,101 INFO READY fastlio
+2026-09-26 21:46:53,103 INFO START motion pid=16561 argv=['ros2', 'launch', 'wheeltec_motion_control', 'motion_control.launch.py', 'params_file:=/home/wheeltec/workspace/wheeltec_motion_ws/src/wheeltec_motion_control/config/motion_control.yaml']
+2026-09-26 21:46:54,710 INFO READY motion
+2026-09-26 21:46:54,711 INFO STACK READY: accepting NEW motion goals; no goal was sent
+2026-09-26 21:46:56,722 WARNING UNHEALTHY fastlio: fastlio stream absent/stale
+2026-09-26 21:46:57,124 INFO STOP motion exit=0
+2026-09-26 21:46:57,326 WARNING RECOVER livox: process exited; old actions will not resume
+2026-09-26 21:46:57,478 INFO STOP fastlio exit=0
+2026-09-26 21:46:57,478 INFO STOP livox exit=0
+2026-09-26 21:47:00,490 INFO START livox pid=16610 argv=['ros2', 'launch', 'livox_ros_driver2', 'msg_MID360s_launch.py']
+2026-09-26 21:47:04,907 INFO READY livox
+2026-09-26 21:47:04,909 INFO START fastlio pid=16645 argv=['ros2', 'launch', 'fast_lio', 'mapping.launch.py', 'config_file:=mid360.yaml', 'rviz:=false']
+2026-09-26 21:47:50,051 WARNING RECOVER fastlio: startup readiness timeout: source timestamp age=1.341s; old actions will not resume
+2026-09-26 21:47:50,202 INFO STOP fastlio exit=0
+2026-09-26 21:47:52,810 WARNING UNHEALTHY livox: lidar stream absent/stale
+2026-09-26 21:47:55,820 WARNING RECOVER livox: lidar stream absent/stale; old actions will not resume
+2026-09-26 21:47:57,475 INFO STOP livox exit=0
+2026-09-26 21:48:03,496 INFO START livox pid=16872 argv=['ros2', 'launch', 'livox_ros_driver2', 'msg_MID360s_launch.py']
+2026-09-26 21:48:07,512 INFO READY livox
+2026-09-26 21:48:07,514 INFO START fastlio pid=16906 argv=['ros2', 'launch', 'fast_lio', 'mapping.launch.py', 'config_file:=mid360.yaml', 'rviz:=false']
+2026-09-26 21:48:09,118 INFO READY fastlio
+2026-09-26 21:48:09,120 INFO START motion pid=16929 argv=['ros2', 'launch', 'wheeltec_motion_control', 'motion_control.launch.py', 'params_file:=/home/wheeltec/workspace/wheeltec_motion_ws/src/wheeltec_motion_control/config/motion_control.yaml']
+2026-09-26 21:48:10,726 INFO READY motion
+2026-09-26 21:48:10,726 INFO STACK READY: accepting NEW motion goals; no goal was sent
+2026-09-26 21:48:12,537 WARNING RECOVER base: process exited; old actions will not resume
+2026-09-26 21:48:12,990 INFO STOP motion exit=0
+2026-09-26 21:48:12,990 INFO STOP base exit=0
+2026-09-26 21:48:16,000 INFO START base pid=16967 argv=['ros2', 'launch', 'turn_on_wheeltec_robot', 'base_serial.launch.py']
+2026-09-26 21:48:17,606 INFO READY base
+2026-09-26 21:48:17,608 INFO START motion pid=16990 argv=['ros2', 'launch', 'wheeltec_motion_control', 'motion_control.launch.py', 'params_file:=/home/wheeltec/workspace/wheeltec_motion_ws/src/wheeltec_motion_control/config/motion_control.yaml']
+2026-09-26 21:48:19,816 INFO READY motion
+2026-09-26 21:48:19,816 INFO STACK READY: accepting NEW motion goals; no goal was sent

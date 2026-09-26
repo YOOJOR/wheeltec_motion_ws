@@ -397,3 +397,15 @@ git status --short > "runtime_logs/$motion_capture_id/git-status.txt"
 把客户端输出、延迟测量、实际现象和启动命令放在同一目录；记录“改了什么、是否重启了哪些节点、重启前后分别是什么结果”。需要录包时可另用 `ros2 bag record -o <尚不存在的输出目录> /Odometry /cmd_vel`，Ctrl+C 正常结束；该包不含完整 Action 结果，仍需客户端日志。录包也增加负载，诊断延迟时需记录是否开启。
 
 原始 runtime_logs 默认不进 Git，避免大量实车记录自动入库；有价值的结论整理到 docs，必要的原始证据另行选择归档。开发和参数长期变更应在本独立仓库提交：先 `git diff` 审核，按文件 `git add`，再 `git commit`；用 `git log --oneline -5` 查看版本。小车与开发机各有本地修改时，先核对 `git status`，不要用强制重置覆盖实车参数。更新代码后在小车重新编译、重新加载环境并重启相关节点；Git 同步文件不会自动更新运行进程。
+
+
+## 一键启动通信、雷达、定位与控制接口
+
+```bash
+cd ~/workspace/wheeltec_motion_ws
+bash scripts/start_robot.sh
+```
+
+等待 `STACK READY` 后发送现有 Action 请求即可。默认不启动 RViz；脚本不发送动作。退出/挂起、数据持续中断或位姿持续过期时按依赖关系自动恢复，恢复后只接收新目标，不续跑旧动作。Ctrl+C 退出全部受管进程。
+
+开始前退出原来手动启动的四个 launch，脚本会拒绝重复节点。仅检查配置用 `bash scripts/start_robot.sh --check`。详细就绪条件、恢复规则、日志、后台停止方式及可调参数见 [统一启动说明](scripts/robot_stack/README.md)。

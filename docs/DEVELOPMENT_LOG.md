@@ -114,3 +114,19 @@
 - 引用用户提供的实测输出：过期定位约 1.4 s；重新运行后平均 31 ms、最大 59 ms；0.2 m 目标最终剩余约 0.02097 m、6.50 s 成功。明确具体重启组件未完整记录、延迟根因未查明、结果不是外部精度测量。
 - 包级 README 链接到完整手册；.gitignore 添加 runtime_logs/，日常原始日志不自动入库，重要结论/证据按需归档。
 - 保留已有未跟踪 analysis/20260925-rotation/height-201mm/，不纳入本次提交。检查文档链接、代码块、Shell 语法与 git diff --check；本次无代码变化，不重复运行 ROS 控制测试。
+
+
+## 2026-09-26 一键启动及自动恢复
+
+- 用户授权实现：通信 → Livox → FAST-LIO → Motion 接口，运行期间异常自动重启；随后明确允许中断现有节点进行接管验证。脚本不发送动作目标，不重放旧请求。
+- 新增 scripts/start_robot.sh、robot_stack/config.yaml、supervisor.py、health.py、使用说明及无 ROS/硬件的故障恢复测试。
+- 显式加载系统 Humble 及四工作空间 local_setup.bash；旧 overlay 路径仅在脚本子环境清除，保留 ROS_DOMAIN_ID/RMW/网络设置，不更改 .bashrc、厂家驱动、STM32 或运动参数。
+- 按实际新数据而非固定 sleep 判断就绪；PowerVoltage 回包、Livox 原始帧头/IMU、连续有效 FAST-LIO 位姿、Action 服务和唯一控制速度发布者。读取实车 motion YAML 中的源时间/接收超时门槛，不放宽 0.5 s。
+- 受管进程退出、子节点退出但 launch 尚在、数据失效均进入恢复。定位/通信异常先撤下 motion；按依赖关系重启。底盘重启保留定位地图；Livox 或 FAST-LIO 重启重置定位，不恢复旧动作。SIGINT 正常退出优先，必要时仅升级自己创建的进程组；启动/恢复指数退避、单实例锁与已有手动节点检测。
+- 本机 8 项测试通过：等待数据和启动顺序、Livox/通信/控制器退出、旧位姿撤下接口、启动超时及退避、退出顺序、真实子进程组清理。小车同 8 项测试通过；--check 确认环境/配置及四个现有手动节点；8 s 被动健康检测四组件均通过，未发送速度。
+- 用户追加授权后停止当前动作并依次退出现有手动 launch，再用新脚本接管；验证记录随后补充。正常监测不自动发布额外 Twist，使用原控制器的正常退出路径请求零速度。已有物理停车能力不由脚本承诺。
+- 实车接管验证完成：先 motion_client stop，再退出四个已核对包名的手动 launch；后台启动 supervisor PID 15624，原始运行目录 runtime_logs/robot_stack/20260926-214333-15624。
+- 首轮启动又实际出现 FAST-LIO 源时间年龄约 1.345 s；接口没有启动，45 s 就绪超时自动重启定位后恢复，随后位姿平均约 42.9 ms 并进入 STACK READY。此为实际旧位姿恢复验证，不认为根因已修复。
+- 在无动作状态对自己启动的四个子节点逐一 SIGTERM：motion 约 20.5 s、FAST-LIO 约 9.0 s、Livox 约 75.1 s、base 约 8.0 s 后恢复整体就绪。Livox 发生一次额外数据超时重试；恢复时间受驱动数据/ROS 发现/就绪门槛影响，不承诺固定时间。
+- 各阶段没有发送 move/rotate/Action goal；base 恢复保留运行中的 Livox/FAST-LIO，定位链故障撤下 motion。验证后总控继续在后台运行，用户无需再并行手动启动四个节点。
+- 选择归档到 logs/robot-stack：单元测试、环境检查、被动健康检查、故障注入结果、分段位姿延迟和总控日志。日常 runtime_logs 保持忽略；未推送 GitHub。

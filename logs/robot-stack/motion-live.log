@@ -1,0 +1,30 @@
+[INFO] [launch]: All log files can be found below /home/wheeltec/workspace/wheeltec_motion_ws/runtime_logs/robot_stack/20260926-214333-15624/ros/2026-09-26-21-44-32-742703-wheeltec-15956
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [motion_controller-1]: process started with pid [15960]
+[motion_controller-1] [INFO] [1790430273.926389510] [wheeltec_motion_controller]: Motion server ready; output enabled=True; extrinsics calibrated=True. No TF or serial port is owned by this node.
+[ERROR] [motion_controller-1]: process has died [pid 15960, exit code -15, cmd '/home/wheeltec/workspace/wheeltec_motion_ws/install/wheeltec_motion_control/lib/wheeltec_motion_control/motion_controller --ros-args -r __node:=wheeltec_motion_controller --params-file /home/wheeltec/workspace/wheeltec_motion_ws/src/wheeltec_motion_control/config/motion_control.yaml --params-file /tmp/launch_params_yq401i2k'].
+[INFO] [launch]: All log files can be found below /home/wheeltec/workspace/wheeltec_motion_ws/runtime_logs/robot_stack/20260926-214333-15624/ros/2026-09-26-21-46-28-391012-wheeltec-16435
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [motion_controller-1]: process started with pid [16436]
+[motion_controller-1] [INFO] [1790430389.215035577] [wheeltec_motion_controller]: Motion server ready; output enabled=True; extrinsics calibrated=True. No TF or serial port is owned by this node.
+[WARNING] [launch]: user interrupted with ctrl-c (SIGINT)
+[INFO] [motion_controller-1]: sending signal 'SIGINT' to process[motion_controller-1]
+[INFO] [motion_controller-1]: process has finished cleanly [pid 16436]
+[INFO] [launch]: All log files can be found below /home/wheeltec/workspace/wheeltec_motion_ws/runtime_logs/robot_stack/20260926-214333-15624/ros/2026-09-26-21-46-53-735340-wheeltec-16561
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [motion_controller-1]: process started with pid [16562]
+[motion_controller-1] [INFO] [1790430414.624843857] [wheeltec_motion_controller]: Motion server ready; output enabled=True; extrinsics calibrated=True. No TF or serial port is owned by this node.
+[WARNING] [launch]: user interrupted with ctrl-c (SIGINT)
+[INFO] [motion_controller-1]: sending signal 'SIGINT' to process[motion_controller-1]
+[INFO] [motion_controller-1]: process has finished cleanly [pid 16562]
+[INFO] [launch]: All log files can be found below /home/wheeltec/workspace/wheeltec_motion_ws/runtime_logs/robot_stack/20260926-214333-15624/ros/2026-09-26-21-48-09-749585-wheeltec-16929
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [motion_controller-1]: process started with pid [16930]
+[motion_controller-1] [INFO] [1790430490.609643663] [wheeltec_motion_controller]: Motion server ready; output enabled=True; extrinsics calibrated=True. No TF or serial port is owned by this node.
+[WARNING] [launch]: user interrupted with ctrl-c (SIGINT)
+[INFO] [motion_controller-1]: sending signal 'SIGINT' to process[motion_controller-1]
+[INFO] [motion_controller-1]: process has finished cleanly [pid 16930]
+[INFO] [launch]: All log files can be found below /home/wheeltec/workspace/wheeltec_motion_ws/runtime_logs/robot_stack/20260926-214333-15624/ros/2026-09-26-21-48-18-304042-wheeltec-16990
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [motion_controller-1]: process started with pid [16992]
+[motion_controller-1] [INFO] [1790430499.146293875] [wheeltec_motion_controller]: Motion server ready; output enabled=True; extrinsics calibrated=True. No TF or serial port is owned by this node.

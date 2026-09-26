@@ -1,0 +1,28 @@
+# ROS 2 Humble。路径中的 ~ 按当前用户展开；不要通过 alias 启动。
+ros_setup: /opt/ros/humble/setup.bash
+workspaces:
+  base: ~/workspace/wheeltec_base_ws
+  livox: ~/workspace/vendor_ws
+  fastlio: ~/workspace/conavGPT_ws
+  motion: ~/workspace/wheeltec_motion_ws
+motion_params: '{motion_workspace}/src/wheeltec_motion_control/config/motion_control.yaml'
+log_root: '{motion_workspace}/runtime_logs/robot_stack'
+# 读取 motion_params 中的 pose_timeout 等定位门槛，不另放宽它们。
+poll_sec: 0.2
+startup_timeout_sec: 45.0
+health_timeout_sec: 2.0
+unhealthy_grace_sec: 3.0
+restart_delay_sec: 3.0
+restart_max_delay_sec: 30.0
+restart_reset_sec: 60.0
+shutdown_grace_sec: 8.0
+shutdown_term_sec: 3.0
+odom_ready_samples: 3
+base_voltage_topic: /PowerVoltage
+lidar_topic: /livox/lidar
+imu_topic: /livox/imu
+commands:
+  base: [ros2, launch, turn_on_wheeltec_robot, base_serial.launch.py]
+  livox: [ros2, launch, livox_ros_driver2, msg_MID360s_launch.py]
+  fastlio: [ros2, launch, fast_lio, mapping.launch.py, 'config_file:=mid360.yaml', 'rviz:=false']
+  motion: [ros2, launch, wheeltec_motion_control, motion_control.launch.py, 'params_file:={motion_params}']
