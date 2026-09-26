@@ -114,3 +114,16 @@
 - 引用用户提供的实测输出：过期定位约 1.4 s；重新运行后平均 31 ms、最大 59 ms；0.2 m 目标最终剩余约 0.02097 m、6.50 s 成功。明确具体重启组件未完整记录、延迟根因未查明、结果不是外部精度测量。
 - 包级 README 链接到完整手册；.gitignore 添加 runtime_logs/，日常原始日志不自动入库，重要结论/证据按需归档。
 - 保留已有未跟踪 analysis/20260925-rotation/height-201mm/，不纳入本次提交。检查文档链接、代码块、Shell 语法与 git diff --check；本次无代码变化，不重复运行 ROS 控制测试。
+
+
+## 2026-09-26 SSH 定位延迟复现排查
+
+- 用户报告 Odometry 约 1.4 s，动作因源时间戳过旧被拒绝；授权 SSH 检查。连接时 Livox/FAST-LIO 已退出，用户随后重新启动底盘通信、lclivox 和 lclocal，故原异常运行状态未能直接测量。
+- .bashrc alias：lclivox 启动 msg_MID360s_launch.py（10 Hz、自定义点云）；lclocal 启动 fast_lio mapping.launch.py config_file:=mid360.yaml（默认还启动 RViz）。正常和异常两次日志均显示 RViz 随后退出，不能由此证明 RViz 是根因。
+- 确认各进程路径来自 vendor_ws/conavGPT_ws；Odometry 和 Livox 点云各只有一个发布者，laser_mapping use_sim_time=False。底盘包不生成 FAST-LIO 的 Odometry，暂无证据把问题归因于工作空间抽取。
+- 新增独立只读脚本 scripts/diagnose_pose_delay.py，同时用 raw=True、best-effort/depth=1 订阅 IMU/点云/Odometry，避免 Python 逐点反序列化干扰；解析帧头与末点时间，并在测量结束用一帧完整 ROS 反序列化交叉核验 CDR 解析。仅被动订阅，没有打开串口、发布速度或修改控制参数。
+- 首次干净 env -i 运行缺 HOME 导致 ROS 日志路径展开失败；指定独立 ROS_LOG_DIR 后成功，不修改 HOME、用户配置或控制器。
+- 15 s 结果：IMU 平均 0.000581 s；点云帧头平均 0.114975 s，帧长约 0.1 s、末点通常仅旧 0.008~0.016 s；Odometry 平均 0.039588 s，150 帧。解析与 ROS 原始消息一致。随后标准 topic delay 约 0.042 s，与轻量测量一致。
+- 本次只能证明重新启动后的链路正常，不能证明故障永久修复，也不能确定队列积压的具体位置。默认 pose_timeout=0.5 保留。故障再现时应先分段采样和留存状态，不立即重启或放宽阈值。
+- 原始输出选择归档至 logs/20260926-delay；脚本语法/CLI 检查与实车被动采样验证，不重复运行运动测试。不记录 SSH 凭据，不修改 STM32/厂家代码，不发送动作。
+- 最终脚本已传到小车 scripts/diagnose_pose_delay.py，--seconds 3 被动检查正常退出，位姿样本均值 0.042705 s。首次发现阶段可能显示 no data，不直接等同于定位中断。当前 analysis/ 已由用户忽略，原始证据改存 logs/20260926-delay 纳入版本。

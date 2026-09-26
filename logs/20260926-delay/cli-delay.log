@@ -1,0 +1,17 @@
+WARNING: topic [/Odometry] does not appear to be published yet
+average delay: 0.044
+	min: 0.041s max: 0.046s std dev: 0.00172s window: 9
+average delay: 0.043
+	min: 0.040s max: 0.046s std dev: 0.00157s window: 19
+average delay: 0.043
+	min: 0.039s max: 0.046s std dev: 0.00151s window: 29
+average delay: 0.043
+	min: 0.039s max: 0.046s std dev: 0.00142s window: 39
+average delay: 0.043
+	min: 0.039s max: 0.048s std dev: 0.00162s window: 49
+average delay: 0.043
+	min: 0.038s max: 0.048s std dev: 0.00183s window: 59
+average delay: 0.042
+	min: 0.038s max: 0.048s std dev: 0.00193s window: 69
+average delay: 0.042
+	min: 0.038s max: 0.049s std dev: 0.00201s window: 79

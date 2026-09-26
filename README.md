@@ -397,3 +397,22 @@ git status --short > "runtime_logs/$motion_capture_id/git-status.txt"
 把客户端输出、延迟测量、实际现象和启动命令放在同一目录；记录“改了什么、是否重启了哪些节点、重启前后分别是什么结果”。需要录包时可另用 `ros2 bag record -o <尚不存在的输出目录> /Odometry /cmd_vel`，Ctrl+C 正常结束；该包不含完整 Action 结果，仍需客户端日志。录包也增加负载，诊断延迟时需记录是否开启。
 
 原始 runtime_logs 默认不进 Git，避免大量实车记录自动入库；有价值的结论整理到 docs，必要的原始证据另行选择归档。开发和参数长期变更应在本独立仓库提交：先 `git diff` 审核，按文件 `git add`，再 `git commit`；用 `git log --oneline -5` 查看版本。小车与开发机各有本地修改时，先核对 `git status`，不要用强制重置覆盖实车参数。更新代码后在小车重新编译、重新加载环境并重启相关节点；Git 同步文件不会自动更新运行进程。
+
+
+## 同时测量 IMU、点云帧起止与位姿延迟
+
+若 1 秒以上的位姿延迟复现，先保持机器人静止和现有定位进程运行，再采样，避免立即重启丢失异常状态。此脚本仅订阅，不发送动作：
+
+```bash
+source /opt/ros/humble/setup.bash
+source ~/workspace/vendor_ws/install/setup.bash
+mkdir -p ~/workspace/wheeltec_motion_ws/runtime_logs
+python3 ~/workspace/wheeltec_motion_ws/scripts/diagnose_pose_delay.py --seconds 15 \
+  | tee ~/workspace/wheeltec_motion_ws/runtime_logs/delay-probe.log
+```
+
+`imu/odom age` 是消息时间戳到接收时刻的秒数；`lidar age` 是点云帧头年龄，`end_age` 是末点年龄，`span` 是首末点间隔。10 Hz 组帧约 0.1 s，因此帧头比末点旧约 0.1 s 是正常现象，不能把这段采样窗口都当作处理延迟。每行 `n` 是该采样窗口收到的数量。
+
+脚本用 raw 订阅避免逐点解码；只支持此项目标准 Livox CustomMsg 的 CDR 布局，并在采样结束与一帧 ROS 反序列化进行核对。它测的是本诊断订阅端，不能单独给出 FAST-LIO 内部队列长度或控制器回调耗时。全部 no data 时检查进程、环境和 ROS_DOMAIN_ID。最终 PASS 只证明消息解析正确，不代表小车运动精度。
+
+2026-09-26 SSH 对照：用户重启后的位姿延迟约 40 ms，标准工具也约 42 ms；异常时约 1.4 s 的运行状态已结束，根因仍未确认。保留异常时与正常时的采样才能继续定位。已归档输出见 logs/20260926-delay。
