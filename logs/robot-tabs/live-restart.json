@@ -1,0 +1,8 @@
+{
+  "test": "Livox child exit recovers in same tab and restores full readiness",
+  "worker_unchanged": true,
+  "generation_before": 1,
+  "generation_after": 2,
+  "ready_after_recover": true,
+  "log": "RECOVER livox: process exited; old actions will not resume\n2026-09-26 22:08:27,281 INFO STOP fastlio in terminal tab\n2026-09-26 22:08:27,384 INFO STOP livox in terminal tab\n2026-09-26 22:08:30,435 INFO START livox in terminal tab; generation=2\n2026-09-26 22:08:34,511 INFO READY livox\n2026-09-26 22:08:34,512 INFO START fastlio in terminal tab; generation=4\n2026-09-26 22:09:19,585 WARNING RECOVER fastlio: startup readiness timeout: source timestamp age=1.317s; old actions will not resume\n2026-09-26 22:09:19,888 INFO STOP fastlio in terminal tab\n2026-09-26 22:09:31,906 INFO START fastlio in terminal tab; generation=5\n2026-09-26 22:09:35,366 INFO READY fastlio\n2026-09-26 22:09:35,367 INFO START motion in terminal tab; generation=2\n2026-09-26 22:09:38,221 INFO READY motion\n2026-09-26 22:09:38,221 INFO STACK READY: accepting NEW motion goals; no goal was sent\n"
+}
