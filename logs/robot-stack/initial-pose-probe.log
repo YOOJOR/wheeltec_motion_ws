@@ -1,0 +1,11 @@
+imu: no data | lidar: no data | odom: n=5 age=0.041s [0.039,0.043]
+imu: no data | lidar: no data | odom: n=9 age=0.042s [0.041,0.043]
+imu: n=196 age=0.001s [0.000,0.003] | lidar: n=10 age=0.116s [0.115,0.118] end_age=0.016s span=0.100s points=20064 | odom: n=10 age=0.043s [0.041,0.046]
+imu: n=200 age=0.001s [0.000,0.003] | lidar: n=10 age=0.115s [0.112,0.117] end_age=0.015s span=0.100s points=19968 | odom: n=11 age=0.043s [0.036,0.047]
+imu: n=201 age=0.001s [0.000,0.003] | lidar: n=10 age=0.115s [0.113,0.116] end_age=0.015s span=0.100s points=19968 | odom: n=10 age=0.044s [0.042,0.047]
+imu: n=200 age=0.001s [0.000,0.003] | lidar: n=10 age=0.116s [0.115,0.118] end_age=0.015s span=0.100s points=19968 | odom: n=10 age=0.043s [0.041,0.045]
+imu: n=201 age=0.001s [0.000,0.003] | lidar: n=10 age=0.116s [0.115,0.118] end_age=0.016s span=0.100s points=19968 | odom: n=10 age=0.043s [0.041,0.046]
+TOTAL imu: n=1189, mean_age=0.000717s
+TOTAL lidar: n=60, mean_age=0.115583s
+TOTAL odom: n=74, mean_age=0.042869s
+PASS: raw lidar parser matches ROS deserialization for first captured frame.

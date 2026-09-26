@@ -416,3 +416,14 @@ python3 ~/workspace/wheeltec_motion_ws/scripts/diagnose_pose_delay.py --seconds 
 脚本用 raw 订阅避免逐点解码；只支持此项目标准 Livox CustomMsg 的 CDR 布局，并在采样结束与一帧 ROS 反序列化进行核对。它测的是本诊断订阅端，不能单独给出 FAST-LIO 内部队列长度或控制器回调耗时。全部 no data 时检查进程、环境和 ROS_DOMAIN_ID。最终 PASS 只证明消息解析正确，不代表小车运动精度。
 
 2026-09-26 SSH 对照：用户重启后的位姿延迟约 40 ms，标准工具也约 42 ms；异常时约 1.4 s 的运行状态已结束，根因仍未确认。保留异常时与正常时的采样才能继续定位。已归档输出见 logs/20260926-delay。
+
+## 一键启动通信、雷达、定位与控制接口
+
+```bash
+cd ~/workspace/wheeltec_motion_ws
+bash scripts/start_robot.sh
+```
+
+等待 `STACK READY` 后发送现有 Action 请求即可。默认不启动 RViz；脚本不发送动作。退出/挂起、数据持续中断或位姿持续过期时按依赖关系自动恢复，恢复后只接收新目标，不续跑旧动作。Ctrl+C 退出全部受管进程。
+
+开始前退出原来手动启动的四个 launch，脚本会拒绝重复节点。仅检查配置用 `bash scripts/start_robot.sh --check`。详细就绪条件、恢复规则、日志、后台停止方式及可调参数见 [统一启动说明](scripts/robot_stack/README.md)。
