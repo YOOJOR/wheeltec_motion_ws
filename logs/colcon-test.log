@@ -1,16 +1,16 @@
 Starting >>> wheeltec_motion_control
 ============================= test session starts ==============================
 platform linux -- Python 3.10.12, pytest-6.2.5, py-1.10.0, pluggy-0.13.0
-cachedir: /ws/build/wheeltec_motion_control/.pytest_cache
-rootdir: /ws/src/wheeltec_motion_control, configfile: setup.cfg, testpaths: test
-plugins: ament-copyright-0.12.15, ament-flake8-0.12.15, ament-lint-0.12.15, ament-pep257-0.12.15, ament-xmllint-0.12.15, launch-testing-1.0.14, launch-testing-ros-0.19.14, colcon-core-0.21.1
+cachedir: /home/wheeltec/workplace/wheeltec_motion_ws/build/wheeltec_motion_control/.pytest_cache
+rootdir: /home/wheeltec/workplace/wheeltec_motion_ws/src/wheeltec_motion_control, configfile: setup.cfg, testpaths: test
+plugins: ament-lint-0.12.11, ament-xmllint-0.12.11, ament-copyright-0.12.11, launch-testing-1.0.7, ament-flake8-0.12.11, launch-testing-ros-0.19.8, ament-pep257-0.12.11, anyio-4.12.0, cov-3.0.0, colcon-core-0.18.4
 collected 22 items
 
 test/test_core.py ................                                       [ 72%]
 test/test_ros_integration.py ......                                      [100%]
 
-------- generated xml file: /ws/build/wheeltec_motion_control/pytest.xml -------
-============================= 22 passed in 11.74s ==============================
-Finished <<< wheeltec_motion_control [12.2s]
+- generated xml file: /home/wheeltec/workplace/wheeltec_motion_ws/build/wheeltec_motion_control/pytest.xml -
+============================= 22 passed in 12.71s ==============================
+Finished <<< wheeltec_motion_control [15.0s]
 
-Summary: 1 package finished [12.3s]
+Summary: 1 package finished [15.7s]

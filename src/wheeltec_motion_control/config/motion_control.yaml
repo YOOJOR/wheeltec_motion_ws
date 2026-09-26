@@ -1,8 +1,8 @@
 wheeltec_motion_controller:
   ros__parameters:
     # 默认不向底盘发任何速度。实车外参配置完毕后再将下面两项设为 true。
-    control_enabled: false
-    extrinsics_calibrated: false
+    control_enabled: true
+    extrinsics_calibrated: true
     odom_topic: /Odometry
     cmd_vel_topic: /cmd_vel
     action_name: /wheeltec_motion/execute
@@ -11,7 +11,7 @@ wheeltec_motion_controller:
     body_frame: body
     # T_body_base: 底盘参考点在 IMU/body 中的位置(m)，及底盘轴转到 body 轴的 RPY(rad)。
     # 以下为占位值，不能当作已测量外参。base 选定为实际底盘控制参考点。
-    body_from_base_translation: [0.0, 0.0, 0.0]
+    body_from_base_translation: [-0.10718, -0.02237, -0.20388]
     body_from_base_rpy: [0.0, 0.0, 0.0]
 
     control_rate_hz: 20.0
