@@ -1,0 +1,13 @@
+2026-09-26 22:12:23,860 INFO Four tabs opened. Ctrl+C in any tab stops the whole stack. Logs: /home/wheeltec/workspace/wheeltec_motion_ws/runtime_logs/robot_stack/20260926-221222-tabs-23196
+2026-09-26 22:12:23,862 INFO START base in terminal tab; generation=1
+2026-09-26 22:12:27,923 INFO READY base
+2026-09-26 22:12:27,924 INFO START livox in terminal tab; generation=1
+2026-09-26 22:12:31,999 INFO READY livox
+2026-09-26 22:12:32,000 INFO START fastlio in terminal tab; generation=1
+2026-09-26 22:13:17,097 WARNING RECOVER fastlio: startup readiness timeout: source timestamp age=1.398s; old actions will not resume
+2026-09-26 22:13:17,300 INFO STOP fastlio in terminal tab
+2026-09-26 22:13:20,363 INFO START fastlio in terminal tab; generation=2
+2026-09-26 22:13:24,645 INFO READY fastlio
+2026-09-26 22:13:24,646 INFO START motion in terminal tab; generation=1
+2026-09-26 22:13:26,274 INFO READY motion
+2026-09-26 22:13:26,275 INFO STACK READY: accepting NEW motion goals; no goal was sent

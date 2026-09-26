@@ -427,3 +427,9 @@ bash scripts/start_robot.sh
 等待 `STACK READY` 后发送现有 Action 请求即可。默认不启动 RViz；脚本不发送动作。退出/挂起、数据持续中断或位姿持续过期时按依赖关系自动恢复，恢复后只接收新目标，不续跑旧动作。Ctrl+C 退出全部受管进程。
 
 开始前退出原来手动启动的四个 launch，脚本会拒绝重复节点。仅检查配置用 `bash scripts/start_robot.sh --check`。详细就绪条件、恢复规则、日志、后台停止方式及可调参数见 [统一启动说明](scripts/robot_stack/README.md)。
+
+## 可选：四个终端标签页管理
+
+在小车图形桌面执行 `bash scripts/start_robot_tabs.sh`，新增窗口的四个标签页分别运行通信、Livox、FAST-LIO、控制接口，在原页内自动恢复。原版 `start_robot.sh` 保留供对比，两者不能同时运行。
+
+`bash scripts/start_robot_tabs.sh --status` 查看状态；`--stop` 停止新版。在任一受管标签页按 Ctrl+C 或关闭该页会停止整套服务。详细切换方式、日志及使用说明见 [标签页版本](scripts/robot_stack/TABS.md)。

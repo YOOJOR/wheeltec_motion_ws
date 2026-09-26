@@ -1,0 +1,6 @@
+{
+  "test": "Ctrl+C in tab stops entire stack",
+  "remaining_nodes": [],
+  "session": "/home/wheeltec/workspace/wheeltec_motion_ws/runtime_logs/robot_stack/20260926-220600-tabs-21549",
+  "note": "Rescan excluded earlier shell command-text false positive; no actual robot nodes remained."
+}

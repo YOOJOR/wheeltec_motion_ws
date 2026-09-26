@@ -142,3 +142,18 @@
 - 在无动作状态对自己启动的四个子节点逐一 SIGTERM：motion 约 20.5 s、FAST-LIO 约 9.0 s、Livox 约 75.1 s、base 约 8.0 s 后恢复整体就绪。Livox 发生一次额外数据超时重试；恢复时间受驱动数据/ROS 发现/就绪门槛影响，不承诺固定时间。
 - 各阶段没有发送 move/rotate/Action goal；base 恢复保留运行中的 Livox/FAST-LIO，定位链故障撤下 motion。验证后总控继续在后台运行，用户无需再并行手动启动四个节点。
 - 选择归档到 logs/robot-stack：单元测试、环境检查、被动健康检查、故障注入结果、分段位姿延迟和总控日志。日常 runtime_logs 保持忽略；未推送 GitHub。
+
+## 2026-09-26 新增 GNOME Terminal 四标签页入口
+
+- 用户要求四个标签页分别运行启动命令、在对应页内自动重启，并明确新增脚本保留原版以便对比。
+- 新增 scripts/start_robot_tabs.sh、robot_stack/tabs.py、test_tabs.py、TABS.md；原 start_robot.sh、supervisor.py、health.py、config.yaml 和运动/厂家代码保持不变。
+- 四个长期存在的终端 worker 各自执行 ROS launch，将原始输出实时显示并 tee 到独立文件。总控复用原 Supervisor / Health，通过本次独立目录内 JSON 原子更新协调启动、停止、代次及就绪；保留依赖恢复、时间戳检查、退避及旧目标不续跑规则。
+- 与原版共享 supervisor.lock，拒绝并行运行；新版重复启动仅提示。--status、--stop 支持从普通 SSH 使用，主动 Ctrl+C / 关闭任一受管标签停止整套，图形入口结束后服务继续运行。
+- worker 关闭/失联退出自己的进程组；总控心跳失联超过 15 s 退出 worker 的 ROS launch。这不替代底盘固件停车保障。工作进程意外消失时按已记录 PID、启动时间与进程组核对清理自己的 launch。
+- 本机及小车各 14 项测试通过：原 8 项依赖恢复测试，加 6 项新测试（四命令引用、同页启动/退出/重启、launch 退出检测、主动中断、总控丢失时子进程退出、四页并发退出）。Shell/Python 语法与 CLI 检查通过，未发送运动动作。
+- 用户之前已授权中断正在运行的节点，本次切换前核对原总控 PID 19468 的命令后发 SIGINT，待退出后启动新版；四个 worker 分别输出到 /dev/pts/2、3、4、5，确认是独立的实际终端标签页。首次运行目录 runtime_logs/robot_stack/20260926-220600-tabs-21549，总控 PID 21578。后续实际恢复/退出验证结果见下方补充与 logs/robot-tabs。
+- 实际雷达子节点退出后，worker PID 21595 保持不变、启动代次 1 → 2，原标签页重启驱动；FAST-LIO 又触发一次源时间过旧重试，22:09:38 恢复全链路就绪。恢复约 72 s，并非固定重启时间；定位延迟根因不属于本次标签页改动，仍未确认。首次验证等待脚本误用了故障前的 STACK READY 行，发现后改为只接受 RECOVER 之后的新就绪行，已修正归档证据。
+- 为避免四页同时退出时共享 stop-request 的临时文件相互覆盖，原子写入使用进程/线程独立临时名，并新增真实四 worker 并发退出测试；已通过。本次仅修订新增文件。
+- 主动停止实车验证：对已核对的 motion 标签 worker 发 SIGINT（等价 Ctrl+C），总控按序停止四组件，确认无实际 ROS 节点残留。第一次 /proc 扫描把带代码文本的 SSH shell 误判为节点，重扫真实节点确认空，归档注明；没有因此杀死额外进程。
+- 更新后重新打开四标签页；最终运行目录 runtime_logs/robot_stack/20260926-221222-tabs-23196，总控 PID 23231。已补充并发退出修复后的 14 项小车测试日志，普通脚本不需要重新编译 ROS 包。未推送 GitHub。
+- 最终运行首轮又出现源时间年龄 1.398 s，45 s 超时后在原 FAST-LIO 标签自动重启，22:13:26 达到 STACK READY；四页继续运行供用户体验。没有改变 pose_timeout，也未发送 move/rotate。
