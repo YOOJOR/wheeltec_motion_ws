@@ -1,2 +1,0 @@
-# Preserve raw tool output without treating its whitespace as source-code defects.
-logs/** -whitespace

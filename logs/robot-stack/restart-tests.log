@@ -1,9 +1,0 @@
-TEST motion: SIGTERM owned node 15960, launch group 15956; no goal sent
-PASS motion: stack recovered after 20.5s
-TEST fastlio: SIGTERM owned node 15927, launch group 15926; no goal sent
-PASS fastlio: stack recovered after 9.0s
-TEST livox: SIGTERM owned node 15699, launch group 15689; no goal sent
-PASS livox: stack recovered after 75.1s
-TEST base: SIGTERM owned node 15677, launch group 15676; no goal sent
-PASS base: stack recovered after 8.0s
-PASS: all four real process-exit recovery tests completed; supervisor remains running.

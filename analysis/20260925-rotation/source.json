@@ -1,8 +1,0 @@
-{
-  "path": "/mnt/rosbag/imu_rotation_calibration",
-  "code_version": "v0.2.0",
-  "files": {
-    "imu_rotation_calibration_0.db3": "1a86b225af53b3048fb69d0739cbdd0daca3a208961b1a961938a8c6dbcaee8c",
-    "metadata.yaml": "e56eace4c46e38fecf6e6402f15df9fcc3e2aa6800975c7a1a004aedd8d65d2a"
-  }
-}

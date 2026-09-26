@@ -1,9 +1,0 @@
-COMMAND: ['ros2', 'run', 'wheeltec_motion_control', 'motion_client', 'move', '0.1']
-EXIT: 1
-goal rejected; see controller log
-[ros2run]: Process exited with failure 1
-
-COMMAND: ['ros2', 'run', 'wheeltec_motion_control', 'motion_client', 'stop']
-EXIT: 0
-Stop requested; this response is not a physical stop measurement.
-

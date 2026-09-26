@@ -1,9 +1,8 @@
 wheeltec_motion_controller:
   ros__parameters:
-    # 第一台 senior_mec_bs 的已使用配置；启动后会持续输出零速度，接受动作后输出运动速度。
-    # 第二台车先用 motion_control.example.yaml，重新确认安装外参后再启用。
-    control_enabled: true
-    extrinsics_calibrated: true
+    # 新车模板：不发布速度，零偏移只是占位值。测量、填写并确认后才能启用。
+    control_enabled: false
+    extrinsics_calibrated: false
     odom_topic: /Odometry
     cmd_vel_topic: /cmd_vel
     action_name: /wheeltec_motion/execute
@@ -11,8 +10,8 @@ wheeltec_motion_controller:
     world_frame: camera_init
     body_frame: body
     # T_body_base: 底盘参考点在 IMU/body 中的位置(m)，及底盘轴转到 body 轴的 RPY(rad)。
-    # base 为地面上的有效旋转中心；XY 来自旋转录包拟合，Z 来自安装高度。
-    body_from_base_translation: [-0.10718, -0.02237, -0.20388]
+    # 按新车实际旋转中心和 IMU 安装重新测量；不要直接沿用第一台车的值。
+    body_from_base_translation: [0.0, 0.0, 0.0]
     body_from_base_rpy: [0.0, 0.0, 0.0]
 
     control_rate_hz: 20.0

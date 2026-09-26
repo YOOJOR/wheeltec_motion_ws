@@ -1,6 +1,0 @@
-imu: n=181 age=0.001s [0.000,0.002] | lidar: n=9 age=0.116s [0.114,0.119] end_age=0.017s span=0.099s points=20160 | odom: no data
-imu: n=201 age=0.001s [0.000,0.001] | lidar: n=10 age=0.115s [0.115,0.116] end_age=0.016s span=0.100s points=19968 | odom: no data
-TOTAL imu: n=580, mean_age=0.000593s
-TOTAL lidar: n=29, mean_age=0.115706s
-TOTAL odom: n=8, mean_age=0.042705s
-PASS: raw lidar parser matches ROS deserialization for first captured frame.

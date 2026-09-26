@@ -1,5 +1,0 @@
-Image: docker.io/library/ros:humble-ros-base-jammy
-Image ID: ab91f7bbc8af87f468127aaa6c4d7f46fed4fa1f03b3a96b6ca44eed03d0ac0b
-Repo digests returned by podman image inspect:
-docker.io/library/ros@sha256:1813d3c85d7f96ff7d3012d865204583255740182db5d0065f8f8cd029a83138
-docker.io/library/ros@sha256:ba0391e31ffcfc5a1014578ecb0f4ca438be9d624b6375c85576ae16bc5232e6

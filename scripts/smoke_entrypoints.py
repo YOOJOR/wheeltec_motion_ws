@@ -6,13 +6,17 @@ import subprocess
 import time
 
 
-logs = Path('logs')
-logs.mkdir(exist_ok=True)
+from ament_index_python.packages import get_package_share_directory
+
+logs = Path(os.environ.get('WHEELTEC_VALIDATION_DIR', 'runtime_logs/validation/smoke'))
+logs.mkdir(parents=True, exist_ok=True)
 launch_log = logs/'launch-smoke.log'
 env = dict(os.environ, ROS_DOMAIN_ID='174', ROS_LOCALHOST_ONLY='1')
 with launch_log.open('w') as output:
     process = subprocess.Popen(
-        ['ros2', 'launch', 'wheeltec_motion_control', 'motion_control.launch.py'],
+        ['ros2', 'launch', 'wheeltec_motion_control', 'motion_control.launch.py',
+         'params_file:='+str(Path(get_package_share_directory('wheeltec_motion_control'))/
+                            'config/motion_control.example.yaml')],
         stdout=output, stderr=subprocess.STDOUT, env=env, start_new_session=True)
     try:
         deadline = time.monotonic()+10

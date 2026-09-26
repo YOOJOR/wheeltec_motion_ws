@@ -1,2 +1,0 @@
-{'base': (True, ''), 'livox': (True, ''), 'fastlio': (True, ''), 'motion': (True, '')}
-PASS: all live health checks passed; subscribed only, no goals or speed published.
