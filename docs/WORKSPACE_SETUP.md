@@ -22,7 +22,7 @@ base 不上传 GitHub。vendor/FAST-LIO 本次不改、不搬；conavGPT_ws 目�
 | 组件 | 相对锁定源码的实际变化 |
 | --- | --- |
 | base 三包 | 45 个源码文件逐一对比厂家来源，无差异。抽取时去掉嵌套 .git 和 Python 缓存，新增过本地 README、构建脚本与记录；通信代码、参数、协议、固件未改 |
-| Livox 驱动 | 仅 config/MID360s_config.json 的雷达 IP：192.168.1.12 → 192.168.1.45。主机 IP 沿用 192.168.1.5，非本次修改 |
+| Livox 驱动 | 源码 config/MID360s_config.json：192.168.1.12 → 192.168.1.45；当前安装副本实际是 192.168.1.145。主机 IP 均沿用 192.168.1.5。源码与安装副本未同步 |
 | FAST-LIO | config/mid360.yaml 的 extrinsic_est_en：true → false。另有 RViz 窗口/视角/强度显示变化、删除 PCD/1 占位文件；不影响定位算法，复刻不必照搬显示改动 |
 | SDK2 | 源码 Git 干净。现有 build 缓存指向旧 Documents/navGPT_ws 目录，不能据此证明 /usr/local 二进制对应当前 HEAD；第二台车从锁定源码重新编译 |
 
@@ -121,7 +121,7 @@ cp ~/workspace/vendor_ws/src/livox_ros_driver2/package_ROS2.xml \
   ~/workspace/vendor_ws/src/livox_ros_driver2/package.xml
 ```
 
-编辑 `vendor_ws/src/livox_ros_driver2/config/MID360s_config.json`：`Mid360s.host_net_info[0].host_ip` 填本车雷达网卡 IP，`lidar_configs[0].ip` 填该雷达 IP。第一台分别为 192.168.1.5 / 192.168.1.45；第二台不能照抄雷达尾号。使用独立直连网络或避免多车同网段地址冲突。
+编辑 `vendor_ws/src/livox_ros_driver2/config/MID360s_config.json`：`Mid360s.host_net_info[0].host_ip` 填本车雷达网卡 IP，`lidar_configs[0].ip` 填该雷达 IP。第一台当前运行的安装配置分别为 192.168.1.5 / 192.168.1.145；源码中的雷达 IP 是 192.168.1.45。两份不同，本次没有改动第三方或重新构建它。复刻第一台当前部署时填写 192.168.1.145；第二台必须按本雷达实际地址填写，不能照抄尾号。使用独立直连网络或避免多车同网段地址冲突。
 
 ```bash
 cd ~/workspace/vendor_ws
@@ -131,6 +131,8 @@ colcon build --base-paths src/livox_ros_driver2 \
 source install/local_setup.bash
 ros2 pkg prefix livox_ros_driver2
 ```
+
+编译后核对 `install/livox_ros_driver2/share/livox_ros_driver2/config/MID360s_config.json`，这是启动实际读取的文件。第一台旧构建为安装副本；不能假定编辑 src 即刻生效。当前 src 与 install 的 IP 差异在重建前必须确认，直接重建现有第一台可能把运行地址改为 .45。
 
 显式选驱动，SDK 由前面的 CMake 安装；不用 colcon 将 SDK 当 ROS 包重复构建。该提交 CMake 直接安装 launch_ROS2，无需额外复制 launch 文件夹。官方 build.sh humble 会删除工作空间 build/devel/install；未来 vendor 合入 FAST-LIO 后尤其不能用它做日常增量构建。
 

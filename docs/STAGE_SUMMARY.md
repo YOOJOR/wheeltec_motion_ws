@@ -40,6 +40,8 @@
 | Livox 驱动 | github.com/Livox-SDK/livox_ros_driver2，master | 4a1def929e5b59c7a8122d19fce6efba581ce9f7 |
 | Livox SDK2 | github.com/Livox-SDK/Livox-SDK2，master | 08f523c930b2f0ba1e98a6afaa8d7476bf479908 |
 
+Livox 主机 IP=192.168.1.5；当前实际启动读取 install 配置的雷达 IP=192.168.1.145，而 src 配置是 192.168.1.45。两份未同步，本版本仅记录，不改第三方。重建驱动前先核对本雷达地址，不能假定源码等于当前运行配置。
+
 SDK 源码干净；现有 SDK 构建缓存仍记录早先 Documents/navGPT_ws 路径，不能仅凭当前源码 HEAD 证明 /usr/local 二进制当时构建自同一提交。第二台车按锁定源码重新编译安装，避免复制这个旧构建目录。完整步骤见 WORKSPACE_SETUP。
 
 ## 3. 数据流与坐标约定
