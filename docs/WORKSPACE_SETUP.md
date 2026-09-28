@@ -179,7 +179,7 @@ bash scripts/build_and_test.sh
 cp docs/WORKSPACE_SETUP.md ~/workspace/README.md
 ```
 
-模板禁用输出与外参确认。测量第二台车的安装姿态、参考点、平移（可用 CALIBRATION 离线录包工具辅助 XY），填写 YAML，再启用；第一台实车数值见 STAGE_SUMMARY，**不是通用默认值**。启动管理配置 `scripts/robot_stack/config.yaml` 的路径、话题也必须与本车一致。路径支持 ~，不依赖 alias。
+模板禁用输出与外参确认。测量第二台车的安装姿态、参考点、平移（可用 CALIBRATION 离线录包工具辅助 XY），填写 YAML，再启用；第一台实车数值见 STAGE_SUMMARY，**不是通用默认值**；当前 main 的第一台配置含响应参数试调，实车效果待确认，example 继续使用原保守参数。启动管理配置 `scripts/robot_stack/config.yaml` 的路径、话题也必须与本车一致。路径支持 ~，不依赖 alias。
 
 图形桌面需要 gnome-terminal；首次启动前关闭其他手动节点，按 OPERATIONS 做静止检查，再由用户试车。启动脚本不自动发运动目标，不会自动重放中断动作。第二台的 Git 分支开发可从当前 main 创建 `git switch -c robot-2`；不要将本车标定参数意外覆盖第一台。
 

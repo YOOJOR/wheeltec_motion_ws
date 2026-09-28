@@ -20,17 +20,18 @@ wheeltec_motion_controller:
     max_linear_speed: 0.15          # m/s；x 轴
     max_lateral_speed: 0.05         # m/s；y 轴，启用横移纠偏才使用
     max_angular_speed: 0.35         # rad/s
-    linear_accel: 0.15             # m/s²，各平移轴；主动停止直接发布零速度
-    angular_accel: 0.5             # rad/s²
-    distance_gain: 0.8             # 1/s
+    # 2026-09-28 响应调参第一档，实车效果待用户验证；旧值见 OPERATIONS。
+    linear_accel: 0.30             # m/s²，各平移轴；主动停止直接发布零速度
+    angular_accel: 1.0             # rad/s²
+    distance_gain: 1.2             # 1/s
     heading_gain: 1.5              # 1/s
     lateral_gain: 0.6              # 1/s
-    rotation_gain: 1.2             # 1/s
+    rotation_gain: 1.6             # 1/s
     lateral_correction: false      # 基本直行通过后再启用麦轮横向纠偏
     distance_tolerance: 0.03       # m
     cross_track_tolerance: 0.05    # m
     angle_tolerance: 0.035         # rad，约 2 度
-    settle_time: 0.4               # s，需要持续收到新的合格位姿
+    settle_time: 0.25              # s，需要持续收到新的合格位姿
     stopped_linear_speed: 0.025    # m/s，用相邻位姿估计，仅为静止判据
     stopped_angular_speed: 0.04    # rad/s
     pose_timeout: 0.5              # s，位姿过期判断，非物理停车时限

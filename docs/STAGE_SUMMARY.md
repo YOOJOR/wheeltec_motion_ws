@@ -89,9 +89,11 @@ Action 定义位于 `src/wheeltec_motion_interfaces/action/ExecuteMotion.action`
 - Ctrl+C 客户端会尝试取消已接受目标；直接 kill 客户端或客户端失联不等于停止请求。明确停止用 Trigger/`motion_client stop`。
 - 不提供独立横移目标、避障或多速度源仲裁；lateral_correction 当前关闭。当前约定 `/cmd_vel` 仅有控制器一个发布者，键盘/导航不要并行发布。
 
-## 5. 第一台车参数基线
+## 5. 第一台车当前参数（响应试调）
 
-`src/wheeltec_motion_control/config/motion_control.yaml` 是第一台车已使用的配置，输出启用；example 是新车的禁用模板。仓库不再假称实车 YAML 为零偏移占位值。
+2026-09-28 用户要求改善起步和收尾，当前已应用第一档响应参数，实际运动效果待用户验证。迁移后的保守配置基线为提交 ff29eb7；回退方法见 OPERATIONS。
+
+`src/wheeltec_motion_control/config/motion_control.yaml` 是第一台车当前配置，输出启用；example 保留原保守参数，作为新车的禁用模板。仓库不再假称实车 YAML 为零偏移占位值。
 
 | 参数 | 当前值 | 含义 |
 | --- | --- | --- |
@@ -100,10 +102,11 @@ Action 定义位于 `src/wheeltec_motion_interfaces/action/ExecuteMotion.action`
 | body_from_base_rpy | [0,0,0] rad | 当前按 IMU 与底盘轴一致配置 |
 | control_rate_hz / feedback_rate_hz | 20 / 5 | 速度更新与 Action 反馈频率 |
 | max_linear_speed / max_angular_speed | 0.15 m/s / 0.35 rad/s | 全局上限，不是每个动作一定达到的速度 |
-| linear_accel / angular_accel | 0.15 m/s² / 0.5 rad/s² | 加速限制；停止直接请求零速度 |
+| linear_accel / angular_accel | 0.30 m/s² / 1.0 rad/s² | 加速限制；停止直接请求零速度 |
 | distance_tolerance / angle_tolerance | 0.03 m / 0.035 rad | 后者约 2° |
 | cross_track_tolerance / lateral_correction | 0.05 m / false | 当前不启用麦轮横移纠偏 |
-| settle_time | 0.4 s | 进入容差后持续稳定判据 |
+| distance_gain / rotation_gain | 1.2 / 1.6 s⁻¹ | 提高末端速度请求，减少低速拖行；实际过冲需试车检查 |
+| settle_time | 0.25 s | 进入容差后持续稳定判据 |
 | pose_timeout / future_stamp_tolerance | 0.5 s / 0.1 s | 位姿源时间与接收新鲜度检查 |
 | default_timeout / no_progress_timeout | 45 s / 5 s | 单动作超时、无可测进展超时 |
 | max_distance / max_rotation | 5 m / 2π rad | 单次相对目标上限 |
@@ -143,6 +146,8 @@ FAST-LIO 重启会重建地图/重置 camera_init 原点；不会续跑旧 Actio
 - 未完成：长期运行、不同距离/地面/负载重复精度、实际停车时间、全项目 TF 验收、RGB-D 相机融合、目标检测/规划、双车通信与协作。
 
 ## 8. 后续工作顺序与更新规则
+
+当前先由用户比较响应试调前后的起步、收尾、过冲和反复纠偏；尚未通过实车验收。限速、到达容差、静止速度阈值和位姿超时没有放宽，底盘固件未改。
 
 1. 先按已固定版本复刻第二台车：IP、串口、车型、IMU/底盘偏移按本车填写，重复编译与基本功能检查。
 2. 用户进行前后直行/左右转向重复测试，用尺子或地面标记作独立参考，记录误差与时间；调整容差/增益须说明理由。

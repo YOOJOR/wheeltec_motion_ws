@@ -111,6 +111,32 @@ ros2 param get /wheeltec_motion_controller use_sim_time
 
 空闲时部分数值参数可以 `ros2 param set`，变化后等待新位姿；动作执行中参数更新会拒绝。topic/Action/service 名称、control_rate_hz、feedback_rate_hz、use_sim_time 需要节点重启。稳定配置应写回 YAML 并提交，不只保留临时 param set。
 
+## 当前响应参数试调与回退
+
+2026-09-28 第一档试调只应用于第一台车的 motion_control.yaml；最高速度、到达容差、静止速度阈值、定位门槛与频率不变。example 保留原保守值。参数更积极不代表底盘实际延迟已消除，实车效果待用户比较。
+
+| 参数 | 保守值 | 当前试调值 |
+| --- | --- | --- |
+| linear_accel | 0.15 | 0.30 m/s² |
+| angular_accel | 0.5 | 1.0 rad/s² |
+| distance_gain | 0.8 | 1.2 s⁻¹ |
+| rotation_gain | 1.2 | 1.6 s⁻¹ |
+| settle_time | 0.4 | 0.25 s |
+
+先用相同的动作目标和 --max-speed 对比起步/收尾时间；再单独提高请求速度，避免把速度变化误认为调参效果。观察是否增加过冲、来回修正或停稳等待。反馈打印频率仍为 5 Hz，SETTLING 输出零速度。
+
+本车旧配置备份：runtime_logs/tuning/20260928-responsive-1/motion_control.before.yaml。保守版本也保存在 Git 提交 ff29eb7 中。需要回退时，在小车桌面执行：
+
+```bash
+cd ~/workspace/wheeltec_motion_ws
+bash scripts/start_robot_tabs.sh --stop
+cp runtime_logs/tuning/20260928-responsive-1/motion_control.before.yaml \
+  src/wheeltec_motion_control/config/motion_control.yaml
+bash scripts/start_robot_tabs.sh
+```
+
+这是整套重启，FAST-LIO 地图原点会重置；等待重新就绪后再发新动作。回退后 YAML 会显示为 Git 修改，保留这个事实，不要强制覆盖。日后有其他参数修改时先比较备份，只恢复上表五项。
+
 ## 自主排查顺序
 
 ```bash
