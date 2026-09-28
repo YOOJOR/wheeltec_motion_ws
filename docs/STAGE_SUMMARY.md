@@ -1,6 +1,6 @@
 # 阶段总结：基础闭环运动控制已可用
 
-基线：**v0.3.0，2026-09-26，ROS 2 Humble / Ubuntu 22.04**。本文是后续开发的统一上下文，可直接据此继续工作；无需阅读早期聊天、逐次开发日志或原始测试输出。只有用户明确要求追查历史问题时才读取旧记录。总体规划仍为开发机 `document/Co-NavGPT2-baseline复现路线图.md`。
+控制基线：**v0.3.0，ROS 2 Humble / Ubuntu 22.04**；部署更新：**2026-09-28，FAST-LIO 已迁入 vendor_ws**。本文是后续开发的统一上下文，可直接据此继续工作；无需阅读早期聊天、逐次开发日志或原始测试输出。只有用户明确要求追查历史问题时才读取旧记录。总体规划仍为开发机 `document/Co-NavGPT2-baseline复现路线图.md`。
 
 ## 1. 当前结论与工作边界
 
@@ -15,7 +15,7 @@
 - 偶发定位延迟先依靠自动恢复继续推进；保留原因未确认的事实，暂不继续深挖。
 - 实车运动验证由用户执行；自动开发验证采用合成话题/独立 ROS 域，不发实车动作。
 - 只将自己的 wheeltec_motion_ws 上传 GitHub；厂家 base 不上传、不改源码。
-- FAST-LIO 暂留 conavGPT_ws，迁入 vendor_ws 是后续事项，本版本不搬动。
+- 用户于 2026-09-28 授权将 FAST-LIO 迁入 vendor_ws；迁移与静止接口验证由开发端完成，随后运动验证由用户执行。
 
 ## 2. 硬件、环境与目录
 
@@ -26,15 +26,15 @@
 | 工作空间 | 内容与职责 | 本次处理 |
 | --- | --- | --- |
 | wheeltec_base_ws | 厂家通信、消息、串口库三包 | 保持原样，源码已核对 45 文件无差异；只记录复刻过程 |
-| vendor_ws | Livox ROS 驱动及 SDK2 源码；SDK 安装在 /usr/local | 不修改；锁定来源和实际配置差异 |
-| conavGPT_ws | 当前仅 FAST_LIO_ROS2；名字不代表已接入 Co-NavGPT2 | 不修改；只关闭过在线外参估计和调整过 RViz 显示 |
+| vendor_ws | Livox 驱动、SDK2 源码、FAST-LIO；SDK 安装在 /usr/local | FAST-LIO 已迁入并重新构建；Livox 安装和 SDK 未重建 |
+| archive/fastlio-migration-20260928/conavGPT_ws | 迁移前完整定位工作空间 | 仅用于回退，不自动 source |
 | wheeltec_motion_ws | 自研 Action、控制、标定、启动管理 | v0.3.0 正式维护仓库 |
 
 来源锁定：
 
 | 组件 | 来源 | 当前源码提交 |
 | --- | --- | --- |
-| 运动控制 | github.com/YOOJOR/wheeltec_motion_ws，main | 用 v0.3.0 标签定位本阶段版本 |
+| 运动控制 | github.com/YOOJOR/wheeltec_motion_ws，main | v0.3.0 固定控制基线；main 含 2026-09-28 迁移部署 |
 | 厂家底盘抽取 | 小车 /home/wheeltec/wheeltec_ros2/src | 独立本地基线 fe99b01f8e047f686aa2d004ddb38a829f909a3b |
 | FAST-LIO | github.com/Ericsii/FAST_LIO_ROS2，ros2 | 2fffc570a25d0df172720bac034fbdb6a13d2162 |
 | Livox 驱动 | github.com/Livox-SDK/livox_ros_driver2，master | 4a1def929e5b59c7a8122d19fce6efba581ce9f7 |
@@ -114,7 +114,7 @@ XY 来自原地左右旋转录包拟合；Z 采用已测雷达底部距地面 0.
 
 ## 6. 日常启动、恢复和停止
 
-推荐小车桌面 `bash ~/workspace/wheeltec_motion_ws/scripts/start_robot_tabs.sh`；没有图形桌面时使用前台 `start_robot.sh`。两者共用配置与单实例锁，不可同时运行。脚本自行清除旧 overlay 子环境并 source 系统 Humble 与四空间 local_setup，不依赖 .bashrc alias。
+推荐小车桌面 `bash ~/workspace/wheeltec_motion_ws/scripts/start_robot_tabs.sh`；没有图形桌面时使用前台 `start_robot.sh`。两者共用配置与单实例锁，不可同时运行。脚本自行清除旧 overlay 子环境并 source 系统 Humble 与三个工作空间 local_setup（共享 vendor 只加载一次），不依赖 .bashrc alias。
 
 启动顺序：收到底盘 PowerVoltage 新回包 → Livox 点云/IMU 新鲜 → FAST-LIO 连续至少 3 条新鲜、递增且 frame/姿态有效的 Odometry → 控制 Action 可用且只有一个控制速度发布者。默认不启动 RViz。运行中的控制器空闲时持续发零速度，停止其他速度发布者后再使用。
 
@@ -133,8 +133,9 @@ FAST-LIO 重启会重建地图/重置 camera_init 原点；不会续跑旧 Actio
 
 ## 7. 已验证事实、限制和已知问题
 
+- 2026-09-28 迁移静止验收通过：新 FAST-LIO 来自 vendor，15 秒 150 条位姿，年龄均值 32.5 ms、最大 45.9 ms；Action/stop 就绪，空闲速度全零。迁移后运动测试待用户执行。
 - 用户已成功执行 0.2 m 低速直行及 90°转向。直行示例结果剩余约 0.02097 m，符合当前 0.03 m 容差；不是毫米级实测精度证明。
-- 运动/标定已有 29 项 Humble 测试覆盖几何变换、速度/加速度、前后直行、跨角转向、停止/取消、位姿异常、超时及离线标定；启动管理 14 项测试覆盖依赖恢复、同页重启、并发退出和进程清理。本版本复验结果见 VALIDATION。
+- 运动/标定已有 29 项 Humble 测试覆盖几何变换、速度/加速度、前后直行、跨角转向、停止/取消、位姿异常、超时及离线标定；启动管理 15 项测试覆盖依赖恢复、同页重启、并发退出和进程清理。控制基线与迁移分别验证的范围见 VALIDATION。
 - 实车已验证四组件退出恢复、Livox 重启保持原标签、主动中断退出全链路，未由开发端发送实车移动/转向目标。
 - 正常 Odometry 时间年龄常约 30–40 ms；偶发启动后约 1.3–1.4 s，单独重启 FAST-LIO 有时恢复。目前只认定“症状可通过重启恢复”，不认定已修复根因。
 - `ros2 topic delay` 是测量订阅回调时刻减 header.stamp；FAST-LIO stamp 是点云扫描结束时间，包含输入、配对/处理、发布及测量端调度，不能直接当作发布到控制器的网络延迟，不能单凭此值证明队列积压。
@@ -147,7 +148,7 @@ FAST-LIO 重启会重建地图/重置 camera_init 原点；不会续跑旧 Actio
 2. 用户进行前后直行/左右转向重复测试，用尺子或地面标记作独立参考，记录误差与时间；调整容差/增益须说明理由。
 3. 上层运动任务编排：每步等 Result；失败、取消、定位重置时终止整段；禁止无条件重放旧请求。先完成短序列再接入规划器。
 4. 结合总体规划推进 RGB-D 相机、TF 和时间配对；按原 Co-NavGPT2 流程做单车融合/规划，再谈多车，不把当前接口当作已经完成导航。
-5. 将 FAST-LIO 合入 vendor_ws 时重新构建干净 install、调整 robot_stack/config.yaml 的 fastlio 路径及 .bashrc/alias，并复验唯一包解析。只记录方案，本次未迁移。
+5. FAST-LIO 已迁入 vendor_ws；后续 vendor 构建需显式选择包，避免 Livox 官方 build.sh 清掉整个 install。旧空间回退步骤见 WORKSPACE_SETUP。迁移后的实际运动结果待用户验证。
 
 新任务开始读取本文；使用细节按需读 OPERATIONS，部署按需读 WORKSPACE_SETUP。旧记录归档在小车 `~/workspace/archive/motion-before-v0.3.0/`、开发机 `archive/motion-before-v0.3.0/`，不是默认阅读入口；Git 旧提交仍保留过程可追溯。
 

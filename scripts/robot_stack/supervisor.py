@@ -54,6 +54,13 @@ def load_config(path):
     return data
 
 
+def environment_setups(config):
+    """Source each workspace once, even when multiple components share it."""
+    paths = [config['ros_setup']]+[
+        str(Path(config['workspaces'][name])/'install/local_setup.bash') for name in ORDER]
+    return list(dict.fromkeys(paths))
+
+
 def existing_nodes():
     matches = []
     for path in Path('/proc').glob('[0-9]*/cmdline'):
@@ -197,7 +204,7 @@ def main():
     parser.add_argument('--print-setups', action='store_true', help=argparse.SUPPRESS)
     args = parser.parse_args()
     config = load_config(args.config)
-    setups = [config['ros_setup']]+[str(Path(config['workspaces'][k])/'install/local_setup.bash') for k in ORDER]
+    setups = environment_setups(config)
     for path in setups+[config['motion_params']]:
         if not Path(path).is_file():
             raise ValueError('missing file: '+path)

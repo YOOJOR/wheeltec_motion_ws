@@ -16,7 +16,7 @@ for tabs_arg in "$@"; do
   esac
 done
 mapfile -d '' -t tabs_setups < <(python3 "$tabs_script_dir/robot_stack/tabs.py" --print-setups "$@")
-[[ ${#tabs_setups[@]} == 5 ]] || { echo '无法读取 ROS 环境路径；检查配置。' >&2; exit 1; }
+[[ ${#tabs_setups[@]} -ge 2 ]] || { echo '无法读取 ROS 环境路径；检查配置。' >&2; exit 1; }
 source "${tabs_setups[0]}"
 for tabs_setup in "${tabs_setups[@]:1}"; do source "$tabs_setup"; done
 exec python3 "$tabs_script_dir/robot_stack/tabs.py" "$@"

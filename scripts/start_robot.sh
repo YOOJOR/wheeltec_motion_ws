@@ -15,7 +15,7 @@ for stack_arg in "$@"; do
   fi
 done
 mapfile -d '' -t stack_setups < <(python3 "$stack_script_dir/robot_stack/supervisor.py" --print-setups "$@")
-[[ ${#stack_setups[@]} == 5 ]] || { echo '无法读取五个 ROS 环境路径；检查配置。' >&2; exit 1; }
+[[ ${#stack_setups[@]} -ge 2 ]] || { echo '无法读取 ROS 环境路径；检查配置。' >&2; exit 1; }
 source "${stack_setups[0]}"
 for stack_setup in "${stack_setups[@]:1}"; do source "$stack_setup"; done
 exec python3 "$stack_script_dir/robot_stack/supervisor.py" "$@"

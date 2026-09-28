@@ -1,6 +1,6 @@
 # 小车 workspace：当前部署与第二台车复刻
 
-基线 v0.3.0，2026-09-26。本文的维护源在 wheeltec_motion_ws/docs/WORKSPACE_SETUP.md，部署副本为小车 `~/workspace/README.md`。后续任务先读 motion 仓库的 `docs/STAGE_SUMMARY.md`；本文负责安装复刻，不依赖历史日志。
+控制基线 v0.3.0；部署更新 2026-09-28：FAST-LIO 已迁入 vendor_ws。本文的维护源在 wheeltec_motion_ws/docs/WORKSPACE_SETUP.md，部署副本为小车 `~/workspace/README.md`。后续任务先读 motion 仓库的 `docs/STAGE_SUMMARY.md`；本文负责安装复刻，不依赖历史日志。
 
 ## 1. 目录与锁定来源
 
@@ -11,11 +11,11 @@
 | wheeltec_base_ws | 厂家通信、消息、serial 三包 | 从厂家原工作空间抽取；本地基线 fe99b01f8e047f686aa2d004ddb38a829f909a3b |
 | vendor_ws/src/Livox-SDK2 | Livox C++ SDK2 | Livox-SDK/Livox-SDK2，08f523c930b2f0ba1e98a6afaa8d7476bf479908 |
 | vendor_ws/src/livox_ros_driver2 | ROS2 驱动 | Livox-SDK/livox_ros_driver2，4a1def929e5b59c7a8122d19fce6efba581ce9f7 |
-| conavGPT_ws/src/FAST_LIO_ROS2 | 当前定位源码 | Ericsii/FAST_LIO_ROS2，ros2 分支，2fffc570a25d0df172720bac034fbdb6a13d2162 |
+| vendor_ws/src/FAST_LIO_ROS2 | 当前定位源码 | Ericsii/FAST_LIO_ROS2，ros2 分支，2fffc570a25d0df172720bac034fbdb6a13d2162 |
 | wheeltec_motion_ws | 自研闭环控制、Action、标定、启动脚本 | YOOJOR/wheeltec_motion_ws，v0.3.0 |
 | archive/motion-before-v0.3.0 | 清理前资料备份 | 仅用户要求排查历史时读取 |
 
-base 不上传 GitHub。vendor/FAST-LIO 本次不改、不搬；conavGPT_ws 目前没有接入 Co-NavGPT2。不要复制 build/install 到第二台车；绝对路径、架构和 underlay 都可能不同。
+base 不上传 GitHub。FAST-LIO 已迁入 vendor_ws，与 Livox 共用工作空间；算法与现有 FAST-LIO 参数保持原样。旧 conavGPT_ws 归档用于回退，尚未接入 Co-NavGPT2。不要复制 build/install 到第二台车；绝对路径、架构和 underlay 都可能不同。
 
 ## 2. 本车实际改动审计
 
@@ -134,27 +134,28 @@ ros2 pkg prefix livox_ros_driver2
 
 编译后核对 `install/livox_ros_driver2/share/livox_ros_driver2/config/MID360s_config.json`，这是启动实际读取的文件。第一台旧构建为安装副本；不能假定编辑 src 即刻生效。当前 src 与 install 的 IP 差异在重建前必须确认，直接重建现有第一台可能把运行地址改为 .45。
 
-显式选驱动，SDK 由前面的 CMake 安装；不用 colcon 将 SDK 当 ROS 包重复构建。该提交 CMake 直接安装 launch_ROS2，无需额外复制 launch 文件夹。官方 build.sh humble 会删除工作空间 build/devel/install；未来 vendor 合入 FAST-LIO 后尤其不能用它做日常增量构建。
+显式选驱动，SDK 由前面的 CMake 安装；不用 colcon 将 SDK 当 ROS 包重复构建。该提交 CMake 直接安装 launch_ROS2，无需额外复制 launch 文件夹。官方 build.sh humble 会删除工作空间 build/devel/install；当前 vendor 已含 FAST-LIO，不能用它做日常增量构建。
 
-## 6. FAST-LIO：仍在 conavGPT_ws
+## 6. FAST-LIO：与 Livox 共用 vendor_ws
 
 新干净 shell，先 source Humble，再加载 vendor 的 local_setup：
 
 ```bash
 source ~/workspace/vendor_ws/install/local_setup.bash
-mkdir -p ~/workspace/conavGPT_ws/src
+mkdir -p ~/workspace/vendor_ws/src
 git clone --branch ros2 https://github.com/Ericsii/FAST_LIO_ROS2.git \
-  ~/workspace/conavGPT_ws/src/FAST_LIO_ROS2
-git -C ~/workspace/conavGPT_ws/src/FAST_LIO_ROS2 checkout \
+  ~/workspace/vendor_ws/src/FAST_LIO_ROS2
+git -C ~/workspace/vendor_ws/src/FAST_LIO_ROS2 checkout \
   2fffc570a25d0df172720bac034fbdb6a13d2162
-git -C ~/workspace/conavGPT_ws/src/FAST_LIO_ROS2 submodule update --init --recursive
+git -C ~/workspace/vendor_ws/src/FAST_LIO_ROS2 submodule update --init --recursive
 ```
 
 此版本 ikd-Tree 子模块为 e2e3f4e9d3b95a9e66b1ba83dc98d4a05ed8a3c4。核对 `config/mid360.yaml`：话题 /livox/lidar、/livox/imu，lidar_type=1、scan_rate=10，extrinsic_T/R 使用锁定上游值；将 **mapping.extrinsic_est_en 设为 false**。不要再复制已知旧的错误内部外参，也不要把底盘偏移写在这里。
 
 ```bash
-cd ~/workspace/conavGPT_ws
-colcon build --base-paths src --packages-select fast_lio --symlink-install \
+cd ~/workspace/vendor_ws
+MAKEFLAGS=-j2 CMAKE_BUILD_PARALLEL_LEVEL=2 colcon build \
+  --base-paths src/FAST_LIO_ROS2 --packages-select fast_lio --symlink-install \
   --executor sequential --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
 source install/local_setup.bash
 ros2 pkg prefix fast_lio
@@ -169,7 +170,8 @@ RViz 外观和 PCD/1 占位文件无需修改；当前启动管理关闭 RViz，
 ```bash
 git clone https://github.com/YOOJOR/wheeltec_motion_ws.git \
   ~/workspace/wheeltec_motion_ws
-git -C ~/workspace/wheeltec_motion_ws checkout v0.3.0
+# main 包含 2026-09-28 vendor 迁移；v0.3.0 标签仍保留旧目录布局
+git -C ~/workspace/wheeltec_motion_ws switch main
 cd ~/workspace/wheeltec_motion_ws
 cp src/wheeltec_motion_control/config/motion_control.example.yaml \
   src/wheeltec_motion_control/config/motion_control.yaml
@@ -179,12 +181,16 @@ cp docs/WORKSPACE_SETUP.md ~/workspace/README.md
 
 模板禁用输出与外参确认。测量第二台车的安装姿态、参考点、平移（可用 CALIBRATION 离线录包工具辅助 XY），填写 YAML，再启用；第一台实车数值见 STAGE_SUMMARY，**不是通用默认值**。启动管理配置 `scripts/robot_stack/config.yaml` 的路径、话题也必须与本车一致。路径支持 ~，不依赖 alias。
 
-图形桌面需要 gnome-terminal；首次启动前关闭其他手动节点，按 OPERATIONS 做静止检查，再由用户试车。启动脚本不自动发运动目标，不会自动重放中断动作。第二台的 Git 分支开发可从标签创建 `git switch -c robot-2`；不要将本车标定参数意外覆盖第一台。
+图形桌面需要 gnome-terminal；首次启动前关闭其他手动节点，按 OPERATIONS 做静止检查，再由用户试车。启动脚本不自动发运动目标，不会自动重放中断动作。第二台的 Git 分支开发可从当前 main 创建 `git switch -c robot-2`；不要将本车标定参数意外覆盖第一台。
 
 第一台升级代码前先 `git status`、保存本车配置；有本地改动先审阅提交，不能用 reset --hard/clean 强行清理。SSH push 显示 SpiritGit 时意味着 SSH 密钥映射到了另一账号，需指定 YOOJOR 对应密钥；clone/只读 HTTPS 不受此影响。
 
-## 8. 未来把 FAST-LIO 放入 vendor（尚未执行）
+## 8. 已执行迁移与回退
 
-保留锁定提交和配置差异；在新目录组装 driver+FAST-LIO，先构建 driver，再加载其环境构建 fast_lio（或使用正确依赖的 colcon 拓扑构建）。SDK 保持外部 CMake 安装。重新生成 install，不能搬旧绝对路径链接。
+2026-09-28：将原 conavGPT_ws/src/FAST_LIO_ROS2 完整复制到 vendor_ws/src，保留 Git、ikd-Tree 子模块和本地配置差异。只重建 fast_lio 的新 build/install，未重建 Livox，未更改 SDK。新旧源码按文件内容核对一致。
 
-迁移时修改 robot_stack/config.yaml 的 fastlio 路径、.bashrc/alias，移除旧空间的自动 source，确保 `ros2 pkg prefix fast_lio` 只解析新目录；再次检查位姿、恢复机制和控制接口。验证前保留原 conavGPT_ws 作为回退。这个迁移不属于 v0.3.0 的已完成事项。
+两种启动脚本的 fastlio 工作空间均改为 vendor_ws，共享环境仅加载一次；.bashrc 删除旧 conavGPT_ws 自动加载，保留 lclocal/lclivox 命令名。旧终端仍可能保留已加载环境，迁移后新开终端，或使用会清除旧 overlay 的受管启动脚本。
+
+旧 conavGPT_ws 整体移到 `~/workspace/archive/fastlio-migration-20260928/conavGPT_ws`，配置快照和编译输出也在该归档目录。该目录仅供用户要求回退/历史排查时使用；不能直接 source 归档中的旧 install，因为它仍含原绝对路径。
+
+回退：先停止受管链路；将归档 conavGPT_ws 移回 ~/workspace/conavGPT_ws（确认目标不存在）；将 robot_stack/config.yaml 的 fastlio 改回该目录。要恢复旧 .bashrc，先比较归档 bashrc.before 与当前文件，避免覆盖以后新增配置。从干净 shell 按 Humble→base→vendor→旧 conavGPT→motion 顺序加载，再做 --check 与定位验证。新 vendor 中的 fast_lio 可保留，旧 overlay 放在后面，但必须确认 ros2 pkg prefix fast_lio 解析到预期旧空间。

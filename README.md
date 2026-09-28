@@ -1,6 +1,6 @@
 # WHEELTEC 闭环运动控制 · v0.3.0
 
-ROS 2 Humble 下的相对直行和原地转向接口：FAST-LIO 位姿 → 底盘参考点换算 → `/cmd_vel` → 原厂串口通信。适用于当前 `senior_mec_bs` 麦克纳姆底盘，不修改 STM32 固件。
+ROS 2 Humble 下的相对直行和原地转向接口：FAST-LIO 位姿 → 底盘参考点换算 → `/cmd_vel` → 原厂串口通信。适用于当前 `senior_mec_bs` 麦克纳姆底盘，不修改 STM32 固件。2026-09-28 已将 FAST-LIO 迁入 vendor_ws，当前 main 使用新布局，v0.3.0 标签保留迁移前布局。
 
 **后续开发先读 [阶段总结](docs/STAGE_SUMMARY.md)**。它记录当前状态、接口、实车参数、已验证范围、已知问题和下一步；无需从历史对话或原始日志恢复上下文。
 
@@ -15,7 +15,7 @@ ROS 2 Humble 下的相对直行和原地转向接口：FAST-LIO 位姿 → 底�
 
 ## 在第一台小车运行
 
-四个工作空间已编译时，在小车图形桌面的终端执行：
+三个工作空间已编译时，在小车图形桌面的终端执行：
 
 ```bash
 cd ~/workspace/wheeltec_motion_ws

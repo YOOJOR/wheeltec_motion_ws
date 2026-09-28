@@ -4,7 +4,7 @@
 
 ## 启动与停止
 
-四工作空间按 WORKSPACE_SETUP 已编译后，在小车桌面终端：
+三个工作空间按 WORKSPACE_SETUP 已编译后，在小车桌面终端：
 
 ```bash
 cd ~/workspace/wheeltec_motion_ws
@@ -54,7 +54,6 @@ ros2 launch livox_ros_driver2 msg_MID360s_launch.py
 # 定位；vendor 是 FAST-LIO 编译/运行依赖
 source /opt/ros/humble/setup.bash
 source ~/workspace/vendor_ws/install/local_setup.bash
-source ~/workspace/conavGPT_ws/install/local_setup.bash
 ros2 launch fast_lio mapping.launch.py config_file:=mid360.yaml rviz:=false
 ```
 

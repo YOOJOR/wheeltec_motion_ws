@@ -3,7 +3,7 @@ ros_setup: /opt/ros/humble/setup.bash
 workspaces:
   base: ~/workspace/wheeltec_base_ws
   livox: ~/workspace/vendor_ws
-  fastlio: ~/workspace/conavGPT_ws
+  fastlio: ~/workspace/vendor_ws
   motion: ~/workspace/wheeltec_motion_ws
 motion_params: '{motion_workspace}/src/wheeltec_motion_control/config/motion_control.yaml'
 log_root: '{motion_workspace}/runtime_logs/robot_stack'

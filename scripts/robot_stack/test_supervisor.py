@@ -42,6 +42,15 @@ class SupervisorTests(unittest.TestCase):
     def ready_stack(self):
         for _ in range(5): self.runner.tick()
         self.assertEqual(self.runner.ready, set(m.ORDER))
+    def test_shared_vendor_environment_and_separate_workspace(self):
+        ws = self.config['workspaces']
+        ws['fastlio'] = ws['livox']
+        expected = [self.config['ros_setup']] + [
+            str(Path(ws[name])/'install/local_setup.bash') for name in ('base', 'livox', 'motion')]
+        self.assertEqual(m.environment_setups(self.config), expected)
+        ws['fastlio'] = '/tmp/separate_fastlio_ws'
+        expected.insert(3, '/tmp/separate_fastlio_ws/install/local_setup.bash')
+        self.assertEqual(m.environment_setups(self.config), expected)
     def test_startup_is_ordered_and_requires_data(self):
         self.health.status['base'] = False
         self.runner.tick(); self.runner.tick()

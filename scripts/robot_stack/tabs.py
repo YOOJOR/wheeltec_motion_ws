@@ -13,7 +13,7 @@ import threading
 import time
 
 import yaml
-from supervisor import ORDER, Processes, Supervisor, existing_nodes, load_config
+from supervisor import ORDER, Processes, Supervisor, environment_setups, existing_nodes, load_config
 
 TITLES = {'base': '底盘通信', 'livox': 'Livox 雷达', 'fastlio': 'FAST-LIO 定位', 'motion': '自动控制接口'}
 SCRIPT = str(Path(__file__).resolve())
@@ -346,7 +346,7 @@ def main():
                 print(TITLES[name]+':', read_json(Path(entry['session'])/(name+'.state.json')).get('phase', 'waiting'),
                       read_json(Path(entry['session'])/(name+'.notice.json')).get('message', ''))
         return
-    setups = [config['ros_setup']]+[str(Path(config['workspaces'][name])/'install/local_setup.bash') for name in ORDER]
+    setups = environment_setups(config)
     for path in setups+[config['motion_params']]:
         if not Path(path).is_file():
             raise ValueError('missing file: '+path)
