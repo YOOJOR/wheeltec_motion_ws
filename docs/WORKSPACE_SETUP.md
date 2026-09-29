@@ -13,11 +13,14 @@
 | vendor_ws/src/livox_ros_driver2 | ROS2 驱动 | Livox-SDK/livox_ros_driver2，4a1def929e5b59c7a8122d19fce6efba581ce9f7 |
 | vendor_ws/src/FAST_LIO_ROS2 | 当前定位源码 | Ericsii/FAST_LIO_ROS2，ros2 分支，2fffc570a25d0df172720bac034fbdb6a13d2162 |
 | wheeltec_motion_ws | 自研闭环控制、Action、标定、启动脚本 | YOOJOR/wheeltec_motion_ws，v0.3.0 |
+| conavgpt2_ws | Co-NavGPT2 官方源码、独立实车依赖与模型 | 2026-09-29 软件准备；来源与版本锁定见本空间 README/deployment.lock.json |
 | archive/motion-before-v0.3.0 | 清理前资料备份 | 仅用户要求排查历史时读取 |
 
-base 不上传 GitHub。FAST-LIO 已迁入 vendor_ws，与 Livox 共用工作空间；算法与现有 FAST-LIO 参数保持原样。旧 conavGPT_ws 归档用于回退，尚未接入 Co-NavGPT2。不要复制 build/install 到第二台车；绝对路径、架构和 underlay 都可能不同。
+base 不上传 GitHub。FAST-LIO 已迁入 vendor_ws，与 Livox 共用工作空间；算法与现有 FAST-LIO 参数保持原样。旧 conavGPT_ws 归档用于回退，新 conavgpt2_ws 用于 Co-NavGPT2 软件部署准备，尚未接通完整导航。不要复制 build/install 或 Python .venv 到第二台车；绝对路径、架构和 underlay 都可能不同。
 
 ## 2. 本车实际改动审计
+
+2026-09-29 新增 `~/workspace/conavgpt2_ws`：官方源码锁定 `891ba09959278b666ef01a7f8b6c64f8fe8436cc`，独立 .venv 继承本机 Jetson PyTorch/ROS，准备 MobileSAM、YOLO-World 与 CLIP 权重，完成离线 CPU/GPU 检查。详细复建步骤见该目录 README.md。D455 当前未连接；尚需验证图像流、相机外参/TF 和 WHEELTEC 控制适配。新空间没有加入现有四组件启动链路，未改当前运动参数和第三方传感器源码。
 
 | 组件 | 相对锁定源码的实际变化 |
 | --- | --- |

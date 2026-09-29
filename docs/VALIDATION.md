@@ -1,5 +1,14 @@
 # 当前验证摘要
 
+## 2026-09-29：Co-NavGPT2 无相机软件部署
+
+- 官方代码位于 `~/workspace/conavgpt2_ws/upstream/Co-NavGPT2`，提交 `891ba09959278b666ef01a7f8b6c64f8fe8436cc`；CLIP 来源、依赖版本和权重 SHA256 分别保存在 conavgpt2_ws 的 deployment.lock.json / models.lock.json。上游算法文件未修改。
+- 独立 .venv 继承本机 Jetson torch/torchvision、Open3D 和 ROS 库，安装实车 import 链所需依赖；未改 motion 参数、底盘、Livox/FAST-LIO、系统 CUDA 或仿真环境。
+- 在 conavgpt2_ws 加载 `source scripts/env.sh` 后执行 `python scripts/check_deployment.py`：CPU 离线检查通过。随后在可访问本机 NVIDIA 设备的环境执行 `python scripts/check_deployment.py --models --device cuda`：全部通过。
+- 范围：23 个上游 Python 文件语法、实车模块导入、合成点云/前沿/FMM、rgb8/16UC1 图像桥接、Orin CUDA 张量及 NMS、YOLO-World/CLIP 类别编码与图像推理、MobileSAM 框提示分割。原始报告在 conavgpt2_ws/runtime_logs/deployment-cpu.json 和 deployment-cuda-models.json；不代表实车识别精度或实时性能验收。
+- 现有 RealSense 驱动 rs_launch.py 参数解析通过；未找到 realsense2_description 包，相机单独启动准备不依赖它。本车未连接 D455，未验证真实图像流、相机外参/TF、WHEELTEC 控制适配、完整导航或云 API。
+- 检查未初始化 ROS 节点、发布速度或发送实车动作，未运行上游会发送 Go2 ZeroMQ 速度的导航入口。torchvision 可选 nvjpeg 扩展缺失提示仍存在，但 OpenCV/CvBridge 与本轮 GPU 推理通过。
+
 ## 2026-09-29：项目复查与响应问题说明
 
 - 加载系统 Humble 后执行 `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$PWD/src/wheeltec_motion_control:$PYTHONPATH" python3 -m pytest -p no:cacheprovider src/wheeltec_motion_control/test/test_core.py src/wheeltec_motion_control/test/test_calibration.py -q`：23 passed（16 核心控制＋7 标定）。初次未加载 Humble 时 rosbag 用例无法导入 rosbag2_py；加载环境后全部通过，无需安装依赖。
