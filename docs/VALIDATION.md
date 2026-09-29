@@ -1,5 +1,12 @@
 # 当前验证摘要
 
+## 2026-09-29：项目复查与响应问题说明
+
+- 加载系统 Humble 后执行 `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$PWD/src/wheeltec_motion_control:$PYTHONPATH" python3 -m pytest -p no:cacheprovider src/wheeltec_motion_control/test/test_core.py src/wheeltec_motion_control/test/test_calibration.py -q`：23 passed（16 核心控制＋7 标定）。初次未加载 Humble 时 rosbag 用例无法导入 rosbag2_py；加载环境后全部通过，无需安装依赖。
+- 执行 `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/robot_stack -p 'test_*.py' -v`：15 passed。
+- 两个启动入口 `--check` 均通过，仅检查环境与配置。本轮未重跑 6 项 ROS 集成测试、未启动硬件或发送实车动作。
+- 文档补充用户反馈的手柄迟滞观察、停稳判据噪声敏感性与同条件验证顺序；0.25 s 迟滞和 0.4 s 切换为尚未同步测量的体感描述，3 mm 抖动为计算示例，均不作为量化实车验收结果。
+
 ## 2026-09-28：第一档响应参数试调
 
 - 仅 motion_control.yaml 五项变化：linear_accel=0.30、angular_accel=1.0、distance_gain=1.2、rotation_gain=1.6、settle_time=0.25；实车旧配置备份在 runtime_logs/tuning/20260928-responsive-1/motion_control.before.yaml，Git 保守基线 ff29eb7。
