@@ -228,3 +228,7 @@ ros2 launch wheeltec_motion_control motion_control.launch.py \
 ```
 
 复现问题至少记录 commit、当前参数、客户端结果与实际现象。原始日志/录包/地图不进 Git；保留有价值的摘要到当前维护文档，长期实验资料存工作空间外的 archive。无需为普通问答追加逐次日志。
+
+### RGB-D 与定位的只读接入
+
+上层可使用 `wheeltec_rgbd.posed.PosedRGBDReader` 同时读取相机观测和 FAST-LIO 对应时刻位姿。必须先提供并确认相机光学坐标系到车体的实测外参；目前不提供用占位值启动真实建图的命令。构造参数、坐标链、定位故障后的地图清理及重置要求见 [CAMERA_INTERFACE](CAMERA_INTERFACE.md) 的位姿衔接部分。该接口只订阅数据，不启动运动、相机或定位进程。

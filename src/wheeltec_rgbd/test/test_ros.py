@@ -156,3 +156,33 @@ def test_processing_stall_cannot_publish_expired_observation(h, monkeypatch):
     h.send()
     h.wait(lambda:h.adapter.rejected > 0)
     assert h.adapter.accepted == 0 and h.reader.latest is None
+
+
+def test_posed_rgbd_end_to_end(h):
+    import numpy as np
+    from nav_msgs.msg import Odometry
+    from wheeltec_rgbd.posed import PosedRGBDReader
+    reader = PosedRGBDReader(body_from_base=np.eye(4), base_from_camera=np.eye(4),
+        extrinsics_confirmed=True, topic='/rgbd_test/output', status_topic='/rgbd_test/status',
+        odom_topic='/rgbd_test/odom')
+    h.executor.add_node(reader)
+    pub = h.source.create_publisher(Odometry, '/rgbd_test/odom', latest_qos())
+    try:
+        h.wait(lambda:pub.get_subscription_count() > 0 and h.adapter.publisher.get_subscription_count() == 2)
+        pair = h.send()
+        pose = Odometry()
+        pose.header.stamp = pair[1].header.stamp
+        pose.header.frame_id, pose.child_frame_id = 'camera_init', 'body'
+        pose.pose.pose.position.x = 2.
+        pose.pose.pose.orientation.w = 1.
+        pub.publish(pose)
+        h.wait(lambda:reader.latest is not None and len(reader.poses.samples) == 1)
+        obs = reader.read_latest()
+        assert obs.pose_stamp_ns == obs.observation.depth_stamp_ns
+        np.testing.assert_allclose(obs.camera_points_to_world([[0,0,1]]), [[2,0,1]])
+        reader.reset_localization()
+        with pytest.raises(NoFreshFrame): reader.read_latest()
+    finally:
+        h.executor.remove_node(reader)
+        reader.destroy_node()
+        h.source.destroy_publisher(pub)

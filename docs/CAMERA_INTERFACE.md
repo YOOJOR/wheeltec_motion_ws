@@ -76,3 +76,30 @@ except NoFreshFrame:
 本阶段完成相机初步接口，尚未完成现有标定文件的设备归属、物理像素配准误差、长时间稳定性、车体外参、运动场景建图或 Co-NavGPT2 自主探索验收。
 
 最终 8 秒静止验收：128 组、约 20.98 Hz，最大源年龄 0.171 s，结束 READY；26 项相机测试通过。真实快照离线通过上游点云构造（降采样/聚类后 339 点），尚未接世界位姿。原始记录在 runtime_logs/camera/20261001-rgbd-interface-verified/，完整验证见 VALIDATION。
+
+## RGB-D 与 FAST-LIO 位姿衔接（2026-10-01）
+
+新增只读 `wheeltec_rgbd.posed.PosedRGBDReader`，继承 RGBDReader；同时订阅 `/Odometry`，要求 camera_init/body，返回 PosedObservation。调用方提供完整的 4×4 `body_from_base`、`base_from_camera`，并显式设置 `extrinsics_confirmed=True`。后者表示相机**彩色光学坐标系**到 wheeltec_base 的刚体变换，不是相机外壳原点；不得用单位矩阵占位后确认。第一台车 body_from_base 从当前 motion_control.yaml 的平移/RPY 构造，不能用厂家车型模板代替。真实相机外参目前仍未确认，所以本轮只验证合成数据。
+
+```python
+from wheeltec_rgbd.posed import PosedRGBDReader
+reader = PosedRGBDReader(
+    body_from_base=T_body_base,       # 当前控制配置构造的 4×4 矩阵
+    base_from_camera=T_base_optical, # 实测并确认的光学坐标系外参
+    extrinsics_confirmed=True,
+)
+# 加入正在运行的 executor；出现 NoFreshFrame 时停止本轮地图/规划更新。
+posed = reader.read_latest(after_stamp_ns=last_stamp)
+last_stamp = posed.observation.stamp_ns
+obs = posed.observation
+# 上游 build_full_scene_pcd(obs.depth_m, obs.rgb, obs.cam_K) 返回相机点云。
+# world_points = posed.camera_points_to_world(camera_points)
+T_world_base = posed.world_from_base
+T_world_camera = posed.world_from_camera
+```
+
+变换为 `T_world_camera = T_world_body × T_body_base × T_base_optical`，保留三维姿态和高度；不能直接把相机位置用作底盘位置。接口不发布 TF，也不发送速度。地图若采用其他轴向，必须再显式适配，不直接宣称已符合上游二维地图坐标。
+
+位姿缓存最多 16 条，按**深度帧**时间选最近位姿，默认差值 ≤0.05 s，不做外推；等待合适位姿时可重试同一尚未消费的 RGB-D，成功后再推进 last_stamp。位姿源和单调接收超时均为 0.5 s、允许超前 0.1 s；相邻位移 >0.5 m、三维转角 >0.8 rad、时间倒退/重复或间隔超时均锁存异常并清空位姿。三维转角检查比原控制器仅检查 yaw 更严格，不改变运动节点门槛。源帧校验不代表物理曝光同步已验收。
+
+锁存后上层必须停止导航、清除旧地图/任务、确认新定位原点，再显式 `reset_localization()`；该方法清除位姿和 RGB-D 当前缓存，不自动发布 stop，后续必须收到新数据。ROS 时间整体重置时应重建 reader 与上层任务。纯数值检测不能识别所有静止原点重置，受管 FAST-LIO 重启事件也必须由上层触发地图/任务重置。相机标定来源仍保留在 observation.calibration_source，外参确认不能替代内参设备归属及物理配准验收。

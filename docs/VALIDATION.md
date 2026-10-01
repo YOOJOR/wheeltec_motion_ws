@@ -120,3 +120,12 @@ bash scripts/start_robot_tabs.sh --check
 清理前已备份小车的 README、CHANGELOG、docs、logs、analysis、实车配置和 Git 历史，以及第三方配置差异。位置为 `~/workspace/archive/motion-before-v0.3.0/`；开发机另有 `archive/motion-before-v0.3.0/` 副本。随后移除 motion 仓库里的旧逐次开发日志、原始日志、分析输出与重复脚本说明，保留 Git 历史；旧 runtime_logs 整目录移动到同一归档的 runtime_logs/，保留全部文件；本次 validation/ 移回当前工作空间。系统 ~/.ros/log 未处理。
 
 本次开发事实集中于 STAGE_SUMMARY，操作集中于 OPERATIONS，部署集中于 WORKSPACE_SETUP。原始记录仅在用户明确要求历史排查时查阅，不再作为后续任务默认输入。
+
+## 2026-10-01 RGB-D / FAST-LIO 只读配对
+
+- `colcon build --packages-select wheeltec_rgbd --symlink-install` 成功，1 包安装完成。
+- `ROS_DOMAIN_ID=179 ROS_LOCALHOST_ONLY=1 ROS_LOG_DIR=$PWD/runtime_logs/posed-validation python3 -m pytest src/wheeltec_rgbd/test -q --junitxml=build/wheeltec_rgbd/pytest.xml`：43 passed / 3.49 s，包含此前 26 项回归和新增 17 项。
+- 覆盖光学轴/平移/旋转组合、非刚体拒绝、位姿有界缓存与匹配窗口、重复/倒序/跳变/断流/未来/过期锁存、单调超时、未确认外参拒绝、真实 ROS Odometry 订阅/帧名/重置，以及合成图像→适配 bundle→位姿配对→世界点的完整只读数据链。
+- 本轮没有重跑 61 项运动或 15 项管理测试，运动代码及配置未改。未启动相机硬件、底盘或 FAST-LIO；只使用本机隔离 ROS 域的合成消息，没有 /cmd_vel 发布者。
+- 首次测试因默认 ROS 日志目录在沙箱只读而失败，随后将 ROS_LOG_DIR 指向仓库忽略的 runtime_logs 后通过；未修改系统权限。构建输出在 runtime_logs/posed-validation-build.log。
+- 真实相机外参、内参设备归属、物理配准、曝光时间同步和世界地图质量均未验收；接口成功不等于自主导航跑通。
