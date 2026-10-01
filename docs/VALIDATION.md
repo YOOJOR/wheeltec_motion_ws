@@ -1,5 +1,16 @@
 # 当前验证摘要
 
+## 2026-10-01：自研 Astra RGB-D 接口
+
+- `bash scripts/build_and_test.sh`：4 个自研包编译安装通过；原控制 61 项、启动管理 15 项、安装后 Action/导航禁用入口与 CLI/关闭 smoke 通过。相机后续扩展用独立域 177/178 复验，最终 `python3 -m pytest src/wheeltec_rgbd/test -q --junitxml=build/wheeltec_rgbd/pytest.xml` 为 26 passed；`colcon test-result --verbose` 为 87 tests，0 errors/failures/skipped。
+- 覆盖 RGB/BGR、16UC1/32FC1、毫米/米、大小端与 padding、范围/NaN、编码/尺寸/内参错误、精确图像内参匹配、时间过期/超前、重复/乱序、有限缓存、去畸变与投影、显式 YAML、断流恢复、ROS 时钟冻结后的单调超时、处理停顿不能发布过期帧、完整 VGA bundle 可在有效期内消费。合成 ROS 测试不启动驱动或底盘。
+- `bash scripts/start_astra_rgbd.sh --check` 参数解析通过，默认加载已有本机 RGB/IR 文件；Bash 语法和 Git diff 空白检查通过。第一台运动配置及厂家/第三方源码未修改。
+- 独立 ROS 域 176、localhost，真实相机最终 8 秒取流：消费 128 组、约 20.98 Hz，RGB/深度 640×480；配对时间差最大 0.02969 s，源时间年龄最大 0.17064 s，结束 READY。深度米制/NaN，当前场景范围内有效覆盖平均约 8.44%；仅为短时场景结果，不是测距精度或长期 30 Hz 验收。域内 /cmd_vel 发布者为 0，结束后关闭本次驱动与适配器。
+- 设备 SDK 两种参数查询格式、取流前后均返回 NaN；原驱动深度 CameraInfo 的 K 含 NaN、彩色回退为 FOV 估算。原驱动还会在无效 SDK 参数时覆盖文件深度 K。自研层独立加载指定 YAML，保留真实 frame/stamp 与尺寸约束；未伪造设备内参或改厂家。现有两文件 K/D/R/P 相同、名称不同且未绑定序列号，输出明确标记 local_yaml_device_binding_unverified，物理归属/配准精度待验收。
+- 发现图像 bytes 赋值触发逐字节校验：本机 1.23 MB 赋值约 0.214 s，而 array('B') 约 0.000163 s；改为字节缓冲后通过真实取流复验，未延长超时。Cyclone 对比未解决旧实现瓶颈，最终使用原环境默认中间件，没有改全局 ROS 设置。
+- 最终快照离线调用 Co-NavGPT2 原版 build_full_scene_pcd：28626 个有效像素，经上游 0.05 m voxel/DBSCAN 后 339 点，点与颜色有限。仅相机光学坐标系，不包含世界变换或运动。首次检查曾错误要求滤波后点数等于输入像素数，按源码的降采样/聚类契约修正后通过。
+- 构建记录：runtime_logs/validation/20261001-193953-9/；最终相机记录/NPZ/点云：runtime_logs/camera/20261001-rgbd-interface-verified/。标定原文件 SHA256：rgb=f5f6f46da364fce1902a393d4e73659fa20b5798ef85276012cc3cef1dddcede，ir=31e84754340d4843be61a6f4bd60affe45f58898db9fa2501f20b71a20b052cb；未复制这些文件到 Git。
+
 ## 2026-10-01：厂家功能包只读追踪
 
 - 从桌面常用指令核对厂家 src/install 包索引、launch/run 入口、相机与车型 Nav2 配置；除 qt_ros_test 外，指令中的去重入口均找到安装入口，包含嵌套 launch。

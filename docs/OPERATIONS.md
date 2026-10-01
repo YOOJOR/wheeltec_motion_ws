@@ -208,6 +208,12 @@ python3 ~/workspace/wheeltec_motion_ws/scripts/diagnose_pose_delay.py --seconds 
 
 工具订阅原始 IMU、CustomMsg、Odometry，不发速度；age 是帧头年龄，end_age 是末点年龄，span 是扫描窗口。10 Hz 时帧头比末点旧约 0.1 s 很常见。末尾 PASS 只验证 CDR 解析与消息反序列化一致，不是定位性能结论。全部 no data 时先查节点、环境、域；初始发现阶段短暂 no data 不等于断流。
 
+## 相机单独使用
+
+在独立终端执行 `bash ~/workspace/wheeltec_motion_ws/scripts/start_astra_rgbd.sh --check`，再用 `--start` 打开相机；Ctrl+C 关闭本次相机链。它不启动底盘、定位或运动控制，不使用厂家 sensors/nav/follower 整车入口，不直接加载整个厂家 overlay。
+
+另一个已 source 系统 Humble 与本仓库 install/local_setup.bash 的终端运行 `ros2 run wheeltec_rgbd rgbd_capture --duration 5 --output ~/workspace/wheeltec_motion_ws/runtime_logs/camera/latest`。消费接口为 /wheeltec_camera/rgbd（原子 RGB、米制深度、内参），诊断为 /wheeltec_camera/status。现有 YAML 明确标记设备归属未核验，raw 深度内参仍可能 NaN；完整参数、外参边界与 Python 示例见 [CAMERA_INTERFACE](CAMERA_INTERFACE.md)。
+
 ## 日志位置
 
 管理脚本每轮目录 `runtime_logs/robot_stack/日期时间[-tabs]-PID/`，`--status` 可显示标签版当前目录。看 `supervisor.log` 的 UNHEALTHY/RECOVER 原因，再看 base/livox/fastlio/motion.log。标签版另有 *-tab.log 和 bootstrap.log；ros/ 保存 ROS 日志，配置快照记录本轮参数。

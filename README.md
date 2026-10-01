@@ -6,12 +6,15 @@ ROS 2 Humble 下的相对直行和原地转向接口：FAST-LIO 位姿 → 底�
 
 2026-10-01 当前 main 新增持续速度导航模式，用于 Co-NavGPT2 周期性更新底盘速度；Action 与导航互斥，停止/失效后不重放旧请求。接口、时间戳与最小接入示例见 [导航说明](docs/NAVIGATION.md)。本次仅完成速度接口和隔离验证，完整自主探索待后续接入。
 
+2026-10-01 新增独立 RGB-D 接口：相机专用启动、已有 YAML 标定加载、米制深度与最新观测读取；真实静止取流已通过，文件的设备归属与车体外参待核验。见 [相机接口](docs/CAMERA_INTERFACE.md)。
+
 **后续开发先读 [阶段总结](docs/STAGE_SUMMARY.md)**。它记录当前状态、接口、实车参数、已验证范围、已知问题和下一步；无需从历史对话或原始日志恢复上下文。
 
 | 文件 | 用途 |
 | --- | --- |
 | [docs/STAGE_SUMMARY.md](docs/STAGE_SUMMARY.md) | 后续工作的统一上下文入口 |
 | [docs/OPERATIONS.md](docs/OPERATIONS.md) | 日常启动、动作调用、参数调整与故障排查 |
+| [docs/CAMERA_INTERFACE.md](docs/CAMERA_INTERFACE.md) | 相机单独启动、RGB-D 契约和新鲜观测读取 |
 | [docs/NAVIGATION.md](docs/NAVIGATION.md) | 持续速度导航契约、Co-NavGPT2 适配与失效停止 |
 | [docs/WORKSPACE_SETUP.md](docs/WORKSPACE_SETUP.md) | 第二台车从源码到编译的复刻步骤；部署为 `~/workspace/README.md` |
 | [docs/CALIBRATION.md](docs/CALIBRATION.md) | 离线旋转录包标定工具 |
@@ -55,7 +58,7 @@ cd ~/workspace/wheeltec_motion_ws
 bash scripts/build_and_test.sh
 ```
 
-脚本仅构建本仓库两个包，使用独立 ROS 域和合成话题进行测试，不启动厂家串口或传感器。输出位于忽略 Git 的 `runtime_logs/validation/`。外部依赖安装见复刻说明。
+脚本仅构建本仓库自研包，使用独立 ROS 域和合成话题进行测试，不启动厂家串口或传感器。输出位于忽略 Git 的 `runtime_logs/validation/`。外部依赖安装见复刻说明。
 
 **`config/motion_control.yaml` 是第一台车的实车配置，输出已启用。** 第二台车先用 `motion_control.example.yaml`（禁用输出、外参占位），完成本车测量后再启用；不要把第一台的偏移当成通用值。
 

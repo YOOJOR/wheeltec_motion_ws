@@ -1,0 +1,14 @@
+rgbd_adapter:
+  ros__parameters:
+    color_topic: /wheeltec_camera/raw/color/image_raw
+    depth_topic: /wheeltec_camera/raw/depth/image_raw
+    color_info_topic: /wheeltec_camera/raw/color/camera_info
+    depth_info_topic: /wheeltec_camera/raw/depth/camera_info
+    output_topic: /wheeltec_camera/rgbd
+    status_topic: /wheeltec_camera/status
+    expected_frame: wheeltec_camera_color_optical_frame
+    frame_timeout: 0.5
+    future_tolerance: 0.1
+    sync_tolerance: 0.03
+    depth_min: 0.4
+    depth_max: 2.0

@@ -1,0 +1,78 @@
+# 自研 ASTRA S RGB-D 接口
+
+首版 2026-10-01。复用本机已安装的 Astra/OpenNI 底层驱动及现有标定文件，使用自研 wheeltec_rgbd 做配对、校验、深度单位/范围转换及最新观测读取。只启动相机，不启动厂家整车、EKF、跟随、SLAM、Nav2，不发布 /cmd_vel。厂家的完整功能包只作参考。
+
+## 启动与停止
+
+本仓库新增 wheeltec_rgbd_interfaces、wheeltec_rgbd；编译和隔离测试仍用 `bash scripts/build_and_test.sh`。
+
+```bash
+cd ~/workspace/wheeltec_motion_ws
+bash scripts/start_astra_rgbd.sh --check
+bash scripts/start_astra_rgbd.sh --start
+```
+
+--check 是默认选项，不打开设备；--start 在前台运行，Ctrl+C 停止本次相机驱动和适配节点。不要同时运行另一个 Astra/OpenNI 进程。脚本仅加载系统 Humble、厂家 astra_camera_msgs/astra_camera 两个设备包以及自研空间；通过 WHEELTEC_ASTRA_INSTALL 可指定另一安装根。它不加载整个厂家 overlay，也不改厂家源码或 YAML。第二台车仍须单独准备兼容的底层驱动、核对设备型号和标定。
+
+本机实际检查发现：SDK 的两种标定查询格式、取流前后均返回 NaN 内参；未加载文件时深度 CameraInfo 含 NaN，彩色则回退到视场角估算。接口拒绝该数据，不使用估算内参冒充设备标定。源码确认 getDepthCameraInfo 会在 SDK 参数无效时覆盖深度 K，因此仅给驱动传标定 URL 仍不能修复；适配层独立加载指定文件并保留真实输入 frame/时间戳与尺寸检查，raw 话题不改写。
+
+启动入口和自研适配层默认显式加载本机已有 ~/.ros/camera_info/rgb_camera.yaml 和 ir_camera.yaml（文件存在时）；其数值有效、尺寸均为 640×480，但两者 K/D/R/P 相同且没有设备序列号，不能证明属于当前 ASTRA S。calibration_source 标为 local_yaml_device_binding_unverified，不把成功读流写成标定精度验收。以 color_info_url、depth_info_url、calibration_source 参数可显式指定其他来源；文件缺失或无效时拒绝观测。厂家 config/camera_info.yaml 名称为 test_camera，未采用。
+
+请求模式：RGB＋深度 640×480@30，IR/点云/GUI 关闭，深度注册到彩色，设备 RGB/深度同步请求开启，仅发布相机内部 TF。驱动请求成功、帧率和同框内参检查不等于物理对齐误差或硬件同步精度已验收。
+
+另一个终端采集：
+
+```bash
+source /opt/ros/humble/setup.bash
+source ~/workspace/wheeltec_motion_ws/install/local_setup.bash
+ros2 run wheeltec_rgbd rgbd_capture --duration 5 \
+  --output ~/workspace/wheeltec_motion_ws/runtime_logs/camera/latest
+```
+
+输出 report.json 与 rgbd.npz（RGB、米制深度、两套 K 和原始时间戳）。NPZ 不带车体位姿，不能直接视为世界地图。无需调用上游带 Go2 控制副作用的 ros_single_nav.py。
+
+## ROS 契约
+
+| 接口 | 类型/语义 |
+| --- | --- |
+| /wheeltec_camera/raw/color/image_raw、camera_info | 底层驱动的彩色与标定 |
+| /wheeltec_camera/raw/depth/image_raw、camera_info | 请求注册后的驱动深度与标定；原始 16UC1 毫米 |
+| /wheeltec_camera/rgbd | wheeltec_rgbd_interfaces/msg/RGBDFrame，原子 RGB-D 观测 |
+| /wheeltec_camera/status | diagnostic_msgs/msg/DiagnosticArray，READY/WAITING/STALE 或具体拒绝原因 |
+
+RGBDFrame 包含 color（rgb8）、depth（32FC1、米）、color_info、depth_info、sequence、calibration_source、rectified、valid_depth_fraction、pairing_delta_sec。深度零值、非有限值、超出 0.4–2.0 m 的像素变为 NaN；整帧没有可用深度时不发布观测。范围是 ASTRA S 当前使用配置，不是避障保证。
+
+两张图各自保留驱动原始时间戳；bundle.header 使用两者中较新的时间。sequence 是适配节点本次进程内计数，重启会归零；消费者使用 after_stamp_ns 判断是否新观测。时间来源为驱动主机回调时刻，不是设备采集时刻。
+
+配对必须满足：同一图像与其 CameraInfo 的时间戳完全相同；两张图时间差 ≤0.03 s；消息源年龄 ≤0.5 s，超前 ≤0.1 s；图像/内参 frame、尺寸一致，注册后的两套 K 相符且有效。默认 frame 为 wheeltec_camera_color_optical_frame。检查帧名和 K 不能替代实际标靶配准验收。
+
+输入采用 BEST_EFFORT/KEEP_LAST，最多四条每路缓存；输出 BEST_EFFORT/KEEP_LAST=1。新鲜图像只能消费一次，旧包/重复/乱序不续期；非法数据清除配对缓存并报告错误，新完整有效组可恢复。处理后再次检查源时间，耗时过长的旧观测也不发布。断流时停止发布图像并报告 STALE，不重复发布旧观测来伪装持续取流。
+
+参数在 src/wheeltec_rgbd/config/astra_s.yaml：四个输入 topic、output_topic、status_topic、expected_frame、frame_timeout、future_tolerance、sync_tolerance、depth_min/max；节点还接受 color_calibration_url、depth_calibration_url、calibration_source，通常由 launch 参数传入。以 `adapter_config:=/绝对路径.yaml` 传入自定义配置。仅处理 rgb8/bgr8、16UC1/32FC1；检查 stride、字节序和数据长度，不通过改尺寸/帧标签掩盖错误。输入 CameraInfo 保留在 raw 话题（当前驱动的深度 K 仍可能为 NaN，消费时使用自研 bundle）；适配层按输入 K/D/P 用 OpenCV 去畸变，RGB 用双线性采样、深度用最近邻，缺失边缘为 NaN。输出 CameraInfo 的 K 使用输入 P 的左 3×3，D 清零，R 为单位阵；输出为同一针孔投影。首版要求注册后的两套 K/D/P 一致，R 为单位阵，P 无立体基线；不支持的模型拒绝，不套用 D455 标定。
+
+## Python 与 Co-NavGPT2 接入
+
+RGBDReader 是独立 ROS Node，可加入上层 executor（建议由后台线程 spin），`read_latest(after_stamp_ns=上次戳)` 返回 Observation；没有新观测、过期或异常时抛 NoFreshFrame。读取同时检查源时间和单调接收年龄，即使上层很久没有执行订阅回调，也不会把过期缓存作为新观测使用。
+
+```python
+from wheeltec_rgbd.client import RGBDReader, NoFreshFrame
+reader = RGBDReader()  # rclpy.init 后创建，并加入正在 spin 的 executor
+last_stamp = 0
+try:
+    obs = reader.read_latest(after_stamp_ns=last_stamp)
+    last_stamp = obs.stamp_ns
+    rgb, depth_m, cam_K = obs.rgb, obs.depth_m, obs.cam_K
+    # geometry/build_full_scene_pcd 使用米制 depth_m；无效值为 NaN。
+    legacy_obs = obs.as_legacy_conav_observation()
+    # 原版 ROS Agent 的 _preprocess_depth 内部 /1000，legacy_obs 只在这里转回毫米。
+except NoFreshFrame:
+    pass  # 等下一组新观测；已有导航运动时按上层契约调用 stop。
+```
+
+原版上游图像 callback 写死 uint16 和紧凑 stride，不能只改订阅话题就接入本 32FC1 输出。应使用上述适配入口；不要把 depth_m 直接交给会再次除以 1000 的原版预处理。该兼容函数只转换观测，不启动 Agent、不连接 Go2、不发速度，也不提供位置/朝向。
+
+本机现有 YAML 已用于初步取流和去畸变，设备归属与实际精度仍需核对；相机装到车体后的外参也需核对。驱动只发布相机内部 TF，本接口不发布 camera_init/body/wheeltec_base 关系，不从厂家车型模板生成未经实测的车体 TF。光学轴按 ROS 相机约定处理：x 向右、y 向下、z 向前；世界坐标投影需上层结合正确外参和位姿。
+
+本阶段完成相机初步接口，尚未完成现有标定文件的设备归属、物理像素配准误差、长时间稳定性、车体外参、运动场景建图或 Co-NavGPT2 自主探索验收。
+
+最终 8 秒静止验收：128 组、约 20.98 Hz，最大源年龄 0.171 s，结束 READY；26 项相机测试通过。真实快照离线通过上游点云构造（降采样/聚类后 339 点），尚未接世界位姿。原始记录在 runtime_logs/camera/20261001-rgbd-interface-verified/，完整验证见 VALIDATION。

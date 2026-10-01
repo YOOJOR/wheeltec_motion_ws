@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build our two packages against Humble; tests never use the real robot topics.
+# Build our own packages against Humble; tests never use the real robot topics.
 set -eo pipefail
 motion_build_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 if [[ "${WHEELTEC_BUILD_CLEAN_ENV:-}" != 1 ]]; then
@@ -20,18 +20,19 @@ python3 --version | tee "$WHEELTEC_VALIDATION_DIR/python-version.txt"
 colcon build --base-paths src --symlink-install --event-handlers console_direct+ \
   2>&1 | tee "$WHEELTEC_VALIDATION_DIR/build.log"
 source install/local_setup.bash
-colcon test --packages-select wheeltec_motion_control --event-handlers console_direct+ \
+colcon test --packages-select wheeltec_motion_control wheeltec_rgbd --event-handlers console_direct+ \
   --return-code-on-test-failure 2>&1 | tee "$WHEELTEC_VALIDATION_DIR/test.log"
 colcon test-result --verbose 2>&1 | tee "$WHEELTEC_VALIDATION_DIR/test-result.log"
 python3 - <<'PY'
 from pathlib import Path
 import xml.etree.ElementTree as ET
-files = list(Path('build/wheeltec_motion_control').rglob('*.xml'))
-count = sum(int(s.attrib.get('tests', 0)) for f in files
-            for s in ET.parse(f).getroot().iter('testsuite'))
-if count == 0:
-    raise SystemExit('ERROR: no tests were discovered')
-print(f'Verified nonempty test results: {count} cases')
+for package in ('wheeltec_motion_control', 'wheeltec_rgbd'):
+    files = list((Path('build') / package).rglob('*.xml'))
+    count = sum(int(s.attrib.get('tests', 0)) for f in files
+                for s in ET.parse(f).getroot().iter('testsuite'))
+    if count == 0:
+        raise SystemExit(f'ERROR: no tests were discovered for {package}')
+    print(f'Verified nonempty test results: {package}: {count} cases')
 PY
 python3 -m unittest discover -s scripts/robot_stack -p 'test_*.py' -v \
   2>&1 | tee "$WHEELTEC_VALIDATION_DIR/stack-tests.log"

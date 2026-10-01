@@ -48,6 +48,6 @@ SDK 声称支持深度→彩色配准和同步，VGA 配准调用成功；这不
 
 短距离和较窄视野会限制每帧可观察空间，影响地图覆盖及前沿探索；D455 的更宽视野、较远推荐测距和全局快门更适合计划中的移动探索。但 D455 推荐近距起点约 0.6 m，不是所有近距场景都优于 ASTRA S，不能当作贴近底盘的避障保证。
 
-当前 start_d455.sh 是 RealSense 专用，不能用于 ASTRA S。接入需使用现有 Astra/OpenNI 驱动，并统一彩色、深度、CameraInfo 与时间/坐标约定，不能直接沿用 D455 内参、外参或相机到 IMU 的变换。本轮没有新增 ROS 相机启动项，也没有完成相机与 FAST-LIO 的 TF 链。
+当前 start_d455.sh 是 RealSense 专用，不能用于 ASTRA S。接入需使用现有 Astra/OpenNI 驱动，并统一彩色、深度、CameraInfo 与时间/坐标约定，不能直接沿用 D455 内参、外参或相机到 IMU 的变换。能力枚举阶段未新增 ROS 启动项；随后已开发独立相机接口并做静止取流，见 CAMERA_INTERFACE。SDK/驱动标定读出为 NaN，当前显式使用本机已有 YAML，文件设备归属与相机到 FAST-LIO 的外参/TF 尚未验收。
 
 原始探针与输出保存在忽略 Git 的 `runtime_logs/camera/20261001-astra-s/`；探针直接使用已有 SDK，未启动上游 Co-NavGPT2 控制入口。
