@@ -32,6 +32,14 @@ with launch_log.open('w') as output:
                 stream.write(f'COMMAND: {command}\nEXIT: {result.returncode}\n{result.stdout}\n')
             if result.returncode != expected:
                 raise RuntimeError(f'CLI exit {result.returncode}, expected {expected}')
+        for operation, expected in [('status', 0), ('enable', 1), ('disable', 0), ('stop', 0)]:
+            command = ['ros2', 'run', 'wheeltec_motion_control', 'navigation_client', operation]
+            result = subprocess.run(command, env=env, text=True,
+                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=10)
+            with (logs/'navigation-client-smoke.log').open('a') as stream:
+                stream.write(f'COMMAND: {command}\nEXIT: {result.returncode}\n{result.stdout}\n')
+            if result.returncode != expected:
+                raise RuntimeError(f'navigation CLI exit {result.returncode}, expected {expected}')
     finally:
         os.killpg(process.pid, signal.SIGINT)
         try:
@@ -44,4 +52,4 @@ if process.returncode != 0:
     raise RuntimeError(f'launch exit: {process.returncode}')
 if 'Traceback' in launch_log.read_text():
     raise RuntimeError('launch logged a traceback')
-print('Installed launch, disabled-goal rejection, stop CLI and Ctrl-C shutdown passed.')
+print('Installed launch, Action/navigation disabled rejection, both CLIs and Ctrl-C shutdown passed.')

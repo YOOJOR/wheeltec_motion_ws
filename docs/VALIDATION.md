@@ -1,5 +1,22 @@
 # 当前验证摘要
 
+## 2026-10-01：持续速度导航接口
+
+环境为小车 Ubuntu 22.04/aarch64、ROS 2 Humble、Python 3.10.12。在实际 motion 仓库执行 `bash scripts/build_and_test.sh`，只构建本仓库两个包，未修改/重建厂家底盘、STM32 或第三方定位代码。第一台车与 example 的所有既有 YAML 值逐项与 HEAD 比对无变化，只新增六项导航设置；构建后 install 配置与 src 相同，本车速度 cap=0.15 m/s、0.35 rad/s，保留已用外参与加速度 0.30 / 1.0。
+
+默认 ROS 域只读执行 `ros2 node list --no-daemon` 返回空列表，本轮没有启动实车链路或读回运行中的实车参数。限速核对依据实际管理脚本读取的源码 YAML 和构建后的安装 YAML；随后正式启动仍须查询运行值。
+
+- 最终构建通过；**61 passed，0 errors / failures / skipped**：16 项原核心控制、7 项标定、16 项导航核心、16 项导航 ROS/适配器、6 项原 ROS Action 集成。原相对运动的正反向、左右转、停稳成功、忙碌拒绝、取消、停止、位姿失效、超时/无进展和参数门槛均回归通过。
+- 导航核心覆盖：重复同速新请求持续运动、运动中改变/反向、最新请求优先、旧/重复及旧会话包不覆盖且不续期、接收与源年龄独立超时、源时钟跳变、待机/零请求、立即停机、无自动重放、每个不支持分量及 NaN/±Inf、错误 frame、正负越界拒绝、限速与逐轴加速度限制、定位故障跨恢复样本保留。
+- **独立域 173、ROS_LOCALHOST_ONLY=1**：合成位姿仅 `/motion_test/odom`，速度只 `/motion_test/velocity`。通过真实 DDS 消息、Action、SetBool/Trigger 与 MotionStatus 检查同速更新之间无零输出，稀疏新请求之间仍由 20 Hz timer 输出、请求变化、唯一速度发布者、时间戳乱序/源过期、非法/越界请求、定位超时与跳变、stop/退出、控制定时器缺口、参数锁定、Action 互斥和结果语义。
+- 节点完整退出/重建后，旧包与未启用时的新包均不能产生运动；重新启用仍须新的有效请求。Python 适配器检查新决策及状态/会话、拒绝重复/过期决策，服务停车和显式恢复通过；没有循环重发功能。补充启用被 Action 占用拒绝时不会顺带停止现有 Action 的回归检查。
+- 启动管理 **15 passed**；独立域 **174** 使用禁用输出 example 检查安装 launch、原 motion_client、navigation_client 的 status/enable/disable/stop、禁用输出时动作/导航拒绝，以及 Ctrl+C 正常退出，全部通过。
+- 初轮沙箱内 ROS 通过共享内存完成测试，但 DDS 网络接口报 Operation not permitted；入口退出另发现重复 SIGINT 中断资源清理。已修复清理阶段信号处理，最终在沙箱外复验完整流程通过，不把沙箱网络错误当作实车 DDS 性能问题。
+
+最终原始输出：`runtime_logs/validation/20261001-173744-18172/`（build.log、test.log、test-result.log、stack-tests.log、launch/client/navigation-client smoke）及 `runtime_logs/validation/navigation-delivery-run.log`，均忽略 Git。此前通过的 60 项轮次位于 20261001-173326-16376，本轮补充适配器拒绝用例至 61 项。
+
+本次没有启动厂家串口/雷达/相机进行验收，没有发送实车运动目标或底盘速度。验证结论为**软件接口与输出契约通过**，不证明物理停车时间、实车惯性/换向响应、真实定位连续性或 VLM/感知实时性；完整 Co-NavGPT2 自主探索仍待 D455、坐标变换、上游出口接入及用户试车。
+
 ## 2026-09-29：Co-NavGPT2 无相机软件部署
 
 - 官方代码位于 `~/workspace/conavgpt2_ws/upstream/Co-NavGPT2`，提交 `891ba09959278b666ef01a7f8b6c64f8fe8436cc`；CLIP 来源、依赖版本和权重 SHA256 分别保存在 conavgpt2_ws 的 deployment.lock.json / models.lock.json。上游算法文件未修改。

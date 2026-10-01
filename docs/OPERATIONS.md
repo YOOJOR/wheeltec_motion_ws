@@ -95,6 +95,20 @@ ros2 service call /wheeltec_motion/stop std_srvs/srv/Trigger '{}'
 
 RUNNING=闭环输出；SETTLING=进入容差、请求零速度并观察是否稳定。直行 remaining 为 m，转向为 rad（角度=rad×180/π），cross 为横向偏差。返回成功只表示当前容差与稳定判据通过，最终 pose 是 camera_init 中的底盘坐标，不是相对移动量。
 
+## 持续速度导航（Co-NavGPT2 接入）
+
+完整坐标/时间戳契约、模式表、Python 适配示例和失效处理见 [NAVIGATION.md](NAVIGATION.md)。本接口负责速度请求与失效停止，路径规划和方向纠偏由上层完成；没有实现闭环路径跟踪。
+
+```bash
+ros2 run wheeltec_motion_control navigation_client status
+ros2 run wheeltec_motion_control navigation_client enable
+# 上层只向 /wheeltec_motion/navigation/cmd_vel 发布新的 TwistStamped；不要直接发 /cmd_vel。
+ros2 run wheeltec_motion_control navigation_client disable
+ros2 run wheeltec_motion_control navigation_client stop
+```
+
+启用等待新请求时为零；Action 与导航互斥。默认底盘控制 frame=`wheeltec_base`，只支持 linear.x / angular.z。本车速度上限仍为 0.15 / 0.35，示例用 0.12 / ±0.30，不使用上游 0.3 / ±0.5。导航请求默认双重超时 0.3 s；正常每约 0.1 s 处理新观测更新，不能定时重发旧决策掩盖卡顿。进入阻塞 VLM/长等待前 stop；超时、定位异常、停止或退出后须显式启用并发新请求，不自动恢复缓存。MotionStatus 为软件模式/输出状态，不是物理停车确认。
+
 ## 配置及生效检查
 
 控制参数在 `src/wheeltec_motion_control/config/motion_control.yaml`；新车模板 example。路径/四条启动命令/恢复时间在 `scripts/robot_stack/config.yaml`。
@@ -104,12 +118,15 @@ ros2 param get /wheeltec_motion_controller control_enabled
 ros2 param get /wheeltec_motion_controller extrinsics_calibrated
 ros2 param get /wheeltec_motion_controller body_from_base_translation
 ros2 param get /wheeltec_motion_controller pose_timeout
+ros2 param get /wheeltec_motion_controller navigation_command_timeout
+ros2 param get /wheeltec_motion_controller max_linear_speed
+ros2 param get /wheeltec_motion_controller max_angular_speed
 ros2 param get /wheeltec_motion_controller use_sim_time
 ```
 
 通过 source + 单独 launch 时默认读取 install 配置；管理脚本明确读取源码配置。修改源码并不等于所有现有节点都已重载；停止并重新启动、再查询参数。普通脚本/源码 YAML 更新一般无需 colcon，但源码/接口或安装内容更改后需重新编译。
 
-空闲时部分数值参数可以 `ros2 param set`，变化后等待新位姿；动作执行中参数更新会拒绝。topic/Action/service 名称、control_rate_hz、feedback_rate_hz、use_sim_time 需要节点重启。稳定配置应写回 YAML 并提交，不只保留临时 param set。
+空闲时部分数值参数可以 `ros2 param set`，变化后等待新位姿；Action 或导航模式中参数更新会拒绝，先 stop/退出。topic/Action/service 名称、navigation_frame、control_rate_hz、feedback_rate_hz、use_sim_time 需要节点重启。navigation_command_timeout 独立于 pose_timeout，新参数也已加入新车 example；稳定配置应写回 YAML 并提交，不只保留临时 param set。
 
 ## 当前响应参数试调与回退
 

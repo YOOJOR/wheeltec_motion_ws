@@ -2,7 +2,7 @@
 <package format="3">
   <name>wheeltec_motion_control</name>
   <version>0.3.0</version>
-  <description>FAST-LIO feedback controller for relative WHEELTEC motions.</description>
+  <description>FAST-LIO relative motion and guarded continuous velocity control for WHEELTEC.</description>
   <maintainer email="maintainer@example.com">WHEELTEC project maintainers</maintainer>
   <license>Apache-2.0</license>
   <buildtool_depend>ament_python</buildtool_depend>

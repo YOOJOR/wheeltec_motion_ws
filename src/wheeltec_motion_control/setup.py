@@ -16,6 +16,7 @@ setup(
     entry_points={'console_scripts': [
         'motion_controller = wheeltec_motion_control.node:main',
         'motion_client = wheeltec_motion_control.client:main',
+        'navigation_client = wheeltec_motion_control.navigation_client:main',
         'calibrate_rotation = wheeltec_motion_control.calibration:main',
     ]},
 )

@@ -1,5 +1,13 @@
 # 版本记录
 
+## 2026-10-01 — 持续速度导航接口（main 扩展）
+
+- 新增 TwistStamped 导航输入、SetBool 启用/退出、MotionStatus；IDLE/ACTION/NAVIGATION 互斥，同一 20 Hz 输出源，保留原相对 Action 的停稳语义。
+- 最新请求替换，无指令队列；双重时间有效期、旧包过滤、分量/frame/限速检查、定位连续性和控制调度检查。停止/失效立即零速度并退出导航，恢复需显式启用和新请求。
+- 保留第一台车全部既有外参、限速及调参值；新增独立导航 timeout=0.3 s 和超前容差=0.1 s，同步禁用的新车模板。
+- 提供不重发旧决策的 Co-NavGPT2 Python 适配器和模式/状态 CLI；新增接入说明，要求阻塞 VLM 前 stop；修复 launch 重复 SIGINT 打断清理。
+- 完成隔离合成验证及原 Action 回归；未发送实车运动指令，未完成 Co-NavGPT2 自主探索/闭环路径跟踪。
+
 ## 2026-09-29 — Co-NavGPT2 软件部署准备
 
 - 用户暂缓运动调参，优先推进 Co-NavGPT2；新增独立 conavgpt2_ws，准备官方源码、Jetson 实车依赖与 MobileSAM/YOLO-World/CLIP 权重。

@@ -1,10 +1,10 @@
-# 阶段总结：基础闭环运动控制已可用
+# 阶段总结：相对动作与持续速度导航接口
 
-控制基线：**v0.3.0，ROS 2 Humble / Ubuntu 22.04**；部署更新：**2026-09-28，FAST-LIO 已迁入 vendor_ws**。本文是后续开发的统一上下文，可直接据此继续工作；无需阅读早期聊天、逐次开发日志或原始测试输出。只有用户明确要求追查历史问题时才读取旧记录。总体规划仍为开发机 `document/Co-NavGPT2-baseline复现路线图.md`。
+控制基线：**v0.3.0，ROS 2 Humble / Ubuntu 22.04**；部署更新：**2026-09-28，FAST-LIO 已迁入 vendor_ws**；当前 main 接口扩展：**2026-10-01，持续速度导航**。本文是后续开发的统一上下文，可直接据此继续工作；无需阅读早期聊天、逐次开发日志或原始测试输出。只有用户明确要求追查历史问题时才读取旧记录。总体规划仍为开发机 `document/Co-NavGPT2-baseline复现路线图.md`。
 
 ## 1. 当前结论与工作边界
 
-总目标为复现 Co-NavGPT2，基础运动接口服务于后续视觉语义导航。2026-09-29 用户调整优先级：暂缓运动参数试调，先推进 Co-NavGPT2 软件部署；车上当前未连接 D455。官方源码、独立实车依赖和三组模型已准备在 `~/workspace/conavgpt2_ws`，通过无硬件离线检查与 GPU 合成输入推理；完整导航仍待相机、TF 和 WHEELTEC 控制适配。部署说明为该目录 README.md，不依赖历史记录。
+总目标为复现 Co-NavGPT2，基础运动接口服务于后续视觉语义导航。2026-09-29 用户调整优先级：暂缓运动参数试调，先推进 Co-NavGPT2 软件部署；车上当前未连接 D455。官方源码、独立实车依赖和三组模型已准备在 `~/workspace/conavgpt2_ws`，通过无硬件离线检查与 GPU 合成输入推理。2026-10-01 在现有 motion 节点新增持续速度导航接口和最小适配器，完成隔离软件验证；完整探索仍待相机、TF、上游出口适配与用户实车验收。软件部署说明为 conavgpt2_ws/README.md，速度接入契约见本仓库 NAVIGATION.md。
 
 当前已完成“FAST-LIO 位姿反馈 → 相对运动 Action → 原厂底盘通信”的基础闭环，并经用户初步实车验证。能够前进/后退、原地左右转向、停止，提供进度与结果、参数配置、离线底盘偏移标定和两种启动/恢复方式。
 
@@ -69,6 +69,9 @@ MID360S → livox_ros_driver2 → /livox/lidar + /livox/imu
 | /PowerVoltage | std_msgs/msg/Float32，用新回包判断底盘通信就绪 |
 | /wheeltec_motion/execute | wheeltec_motion_interfaces/action/ExecuteMotion |
 | /wheeltec_motion/stop | std_srvs/srv/Trigger |
+| /wheeltec_motion/navigation/cmd_vel | geometry_msgs/msg/TwistStamped，最新底盘速度输入 |
+| /wheeltec_motion/navigation/set_enabled | std_srvs/srv/SetBool，显式启用/退出导航 |
+| /wheeltec_motion/status | wheeltec_motion_interfaces/msg/MotionStatus，模式/原因/请求与软件输出 |
 
 底盘节点使用 `/dev/wheeltec_controller`，115200 baud。闭环控制器不打开串口、不发布 TF。不要把 body 改名当成 base_link，也不要向 FAST-LIO 的 body→地图链额外发布重复 TF。当前控制器内部换算底盘位姿；供相机融合/导航使用的完整 TF 链仍需后续明确唯一发布者。
 
@@ -78,11 +81,19 @@ FAST-LIO 的 `mapping.extrinsic_T` 是雷达原点在 IMU 中的位置，与底�
 
 ## 4. 控制原理和上层调用契约
 
-`wheeltec_motion_interfaces` 只生成 Action 类型；`wheeltec_motion_control` 提供服务端、CLI 和离线标定。任何具备该接口类型、处于同一 ROS 域/可达网络的 ROS2 程序都可调用；这里不是 HTTP API。
+`wheeltec_motion_interfaces` 生成 Action 和 MotionStatus 类型；`wheeltec_motion_control` 提供服务端、CLI、导航适配器和离线标定。任何具备该接口类型、处于同一 ROS 域/可达网络的 ROS2 程序都可调用；这里不是 HTTP API。
 
 目标从**接受请求时的底盘位姿**定义。直行沿当时底盘 X 轴计算已走距离/横向偏差，用比例控制、航向修正、限速和加速度限制输出 Twist。转向累计连续 yaw，避免跨 ±π 的方向错误。进入容差后发布零速度并等待新的位姿满足稳定条件，才返回成功。
 
-SETTLING 阶段继续发送 Action 反馈，但速度输出为零；终端持续反馈不等于持续要求移动。上层逐步等待 Result 时仍会等待停稳，影响序列耗时。未来连续导航应设计连续轨迹跟踪，避免把长路径拆成大量“短动作—停车—等待”的序列。
+SETTLING 阶段继续发送 Action 反馈，但速度输出为零；终端持续反馈不等于持续要求移动。上层逐步等待 Result 时仍会等待停稳，影响序列耗时。Co-NavGPT2 持续探索使用下述导航速度模式，不反复提交/取消短 Action；本次没有实现连续轨迹跟踪。
+
+持续导航契约（详见 [NAVIGATION](NAVIGATION.md)）：
+
+- IDLE / ACTION / NAVIGATION 互斥；Action 预留或执行时拒绝导航切换，导航时拒绝 Action。唯一 20 Hz 输出定时器协调空闲零速度、Action 和导航，导航输入 depth=1，不积累目标队列。
+- 启用后 WAITING 输出零速度；新请求直接替换速度目标，相同速度的新请求保持连续运动，不等待停稳。只接受底盘控制点 `wheeltec_base` 的 linear.x / angular.z，其他分量须为零；标签不代表 TF 已建立。方向纠偏/FMM 目标变换由上层负责。
+- 源 ROS 时间严格递增且晚于本次启用；单调接收年龄与源年龄均不得超过 navigation_command_timeout=0.3 s，允许超前 navigation_future_stamp_tolerance=0.1 s。旧/重复包忽略且不续期；新的非法/越界请求退出导航并立即零速度。
+- 位姿源/接收新鲜且连续有效，复用既有定位门槛；跳变、断流、超时、控制调度超过 max_control_gap 或异常均清空缓存并转 IDLE。导航 stop/退出也如此；必须显式重新启用并接收新的有效请求才能恢复，节点重启不续跑。
+- 保留 cap=0.15 m/s、0.35 rad/s、当前加速度与安装外参；新零速度请求立即停车但保持 NAVIGATION/ZERO。命令零速度不等于实测物理停车。正常上层持续产生新决策，进入阻塞 VLM/长等待前先 stop，禁止换新时间戳循环重发旧决策或无限延长 timeout。
 
 Action 定义位于 `src/wheeltec_motion_interfaces/action/ExecuteMotion.action`：
 
@@ -116,6 +127,7 @@ Action 定义位于 `src/wheeltec_motion_interfaces/action/ExecuteMotion.action`
 | distance_gain / rotation_gain | 1.2 / 1.6 s⁻¹ | 提高末端速度请求，减少低速拖行；实际过冲需试车检查 |
 | settle_time | 0.25 s | 进入容差后持续稳定判据 |
 | pose_timeout / future_stamp_tolerance | 0.5 s / 0.1 s | 位姿源时间与接收新鲜度检查 |
+| navigation_command_timeout / navigation_future_stamp_tolerance | 0.3 s / 0.1 s | 导航指令双重有效期与源时间超前量，独立于位姿门槛 |
 | default_timeout / no_progress_timeout | 45 s / 5 s | 单动作超时、无可测进展超时 |
 | max_distance / max_rotation | 5 m / 2π rad | 单次相对目标上限 |
 
@@ -140,12 +152,13 @@ XY 来自原地左右旋转录包拟合；Z 采用已测雷达底部距地面 0.
 
 标签页版本 `--status` 查看、`--stop` 停止；任一受管标签 Ctrl+C 或关闭它会停止整套服务，不再重启。普通启动终端返回后标签页继续运行。原版前台 Ctrl+C 同样退出全部；后台原版需先核对 supervisor.lock 的 PID/命令后发 SIGINT。脚本不保证自己被 SIGKILL 后仍作为系统服务存活，也没有注册开机启动。
 
-FAST-LIO 重启会重建地图/重置 camera_init 原点；不会续跑旧 Action。后续任务编排必须结束旧任务、重新确认定位和目标，再由上层明确发新目标。
+FAST-LIO 重启会重建地图/重置 camera_init 原点；不会续跑旧 Action 或导航速度。后续任务编排必须结束旧任务、重新确认定位和目标，再由上层明确启用导航并发新请求。
 
 ## 7. 已验证事实、限制和已知问题
 
 - 2026-09-29 Co-NavGPT2 官方源码锁定为 `891ba09959278b666ef01a7f8b6c64f8fe8436cc`；23 个 Python 文件语法与实车 import 链检查通过，合成 RGB-D 点云、前沿/FMM、CvBridge 转换及 Orin CUDA/NMS 检查通过。YOLO-World、CLIP 与 MobileSAM 本地模型完成 GPU 合成输入推理。D455、真实视觉导航和云 API 本轮未验证。
-- 上游实车入口含写死的 Go2 ZeroMQ 地址、相机安装外参与 camera_init_1/body_1，单车还无条件开启 GUI；本轮没有运行这些入口。后续需在独立代码中适配本车 TF、相机同步与运动 Action，不能仅重命名话题就认定接入完成。
+- 上游实车入口含写死的 Go2 ZeroMQ 地址、相机安装外参与 camera_init_1/body_1，单车还无条件开启 GUI；没有运行这些入口。2026-10-01 已提供持续导航速度接口与最小适配器；尚需在独立代码中适配本车 TF、相机同步与上游控制出口，不能仅重命名话题就认定接入完成。
+- 2026-10-01 导航扩展：61 项控制/标定/ROS 测试及 15 项启动管理测试通过；ROS 域 173/174 合成验证连续更新、互斥、旧包过滤、超时/定位异常/停止、限速加速度、节点重启不重放、适配器与原 Action。适配器启用被拒绝时不停止现有 Action；安装入口单独 smoke 验证禁用输出与状态/服务。实车未发送运动指令，详见 VALIDATION。
 - 2026-09-28 迁移静止验收通过：新 FAST-LIO 来自 vendor，15 秒 150 条位姿，年龄均值 32.5 ms、最大 45.9 ms；Action/stop 就绪，空闲速度全零。迁移后运动测试待用户执行。
 - 用户已成功执行 0.2 m 低速直行及 90°转向。直行示例结果剩余约 0.02097 m，符合当前 0.03 m 容差；不是毫米级实测精度证明。
 - 控制与标定测试共 23 项（16 核心控制＋7 标定）；加上 6 项合成 ROS 集成测试，Humble 基线共 29 项。启动管理另有 15 项测试覆盖依赖恢复、同页重启、并发退出和进程清理；不能把本轮仅复查 23 项写成重跑了全部 29 项。各轮范围见 VALIDATION。
@@ -162,7 +175,7 @@ FAST-LIO 重启会重建地图/重置 camera_init 原点；不会续跑旧 Actio
 
 1. 维护 conavgpt2_ws 的锁定源码、独立实车环境和离线验证；本阶段软件准备已完成。原版仿真环境和 HM3D 数据集未部署。
 2. D455 接入后验证彩色、对齐深度与内参，确认图像编码/stride、深度单位、同步 QoS；测量本车相机外参，明确 TF 唯一发布者。
-3. 独立适配上游 Go2 控制出口到现有 Action/stop，先用禁用输出方式验证感知、建图与规划，再由用户试车；每步等 Result，失败、取消、定位重置时终止整段，禁止无条件重放旧请求。连续导航避免大量短动作反复停稳。
+3. 独立适配上游 Go2 控制出口到 navigation/cmd_vel + set_enabled/stop/status（接口已完成，见 NAVIGATION）。先隔离验证感知、建图和规划，再由用户试车；正常运动周期性产生新决策，VLM 长等待前明确 stop，失败或定位重置终止旧任务并重新确认；有限距离/转角才使用 Action 并等 Result。
 4. 按固定版本复刻第二台车并重新标定，随后验证多车命名空间、地图配准、VLM 分配与通信；不能把当前离线模型测试当作多车导航已完成。
 5. 运动响应仍为待办：恢复验证时先保持相同目标和 --max-speed，记录误差、运动耗时及 SETTLING 等待；若仍迟滞再同步比较 ROS 指令与手柄响应，排除自动控制零速度和受管重启造成的控制源冲突。
 6. FAST-LIO 已迁入 vendor_ws；后续 vendor 构建显式选择包，避免 Livox 官方 build.sh 清掉整个 install。旧空间回退步骤见 WORKSPACE_SETUP。

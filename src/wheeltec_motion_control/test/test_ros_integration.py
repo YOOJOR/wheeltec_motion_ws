@@ -55,12 +55,15 @@ class Plant(Node):
             self.publisher.publish(msg)
 
 
-class RosIntegrationTests(unittest.TestCase):
+class RosHarness(unittest.TestCase):
     def setUp(self):
         rclpy.init(args=[
             '--ros-args', '-p', 'control_enabled:=true', '-p', 'extrinsics_calibrated:=true',
             '-p', 'odom_topic:=/motion_test/odom', '-p', 'cmd_vel_topic:=/motion_test/velocity',
             '-p', 'action_name:=/motion_test/execute', '-p', 'stop_service:=/motion_test/stop',
+            '-p', 'navigation_topic:=/motion_test/navigation/cmd_vel',
+            '-p', 'navigation_mode_service:=/motion_test/navigation/set_enabled',
+            '-p', 'status_topic:=/motion_test/status',
             '-p', 'settle_time:=0.12', '-p', 'pose_timeout:=0.25',
             '-p', 'no_progress_timeout:=0.6', '-p', 'max_control_gap:=0.8',
         ])
@@ -104,6 +107,8 @@ class RosIntegrationTests(unittest.TestCase):
     def expect_zero(self):
         self.wait(lambda: self.plant.commands and self.plant.commands[-1] == (0, 0, 0))
 
+
+class RosIntegrationTests(RosHarness):
     def test_successive_forward_reverse_and_rotation(self):
         for kind, target in [(1, 0.12), (1, -0.12), (2, 0.35), (2, -0.35)]:
             handle = self.send(target, kind)

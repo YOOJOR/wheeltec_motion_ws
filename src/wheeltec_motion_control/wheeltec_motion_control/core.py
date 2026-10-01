@@ -74,6 +74,8 @@ class Config:
     stopped_linear_speed: float = 0.025
     stopped_angular_speed: float = 0.04
     pose_timeout: float = 0.5
+    navigation_command_timeout: float = 0.3
+    navigation_future_stamp_tolerance: float = 0.1
     future_stamp_tolerance: float = 0.1
     max_position_jump: float = 0.5
     max_yaw_jump: float = 0.8
@@ -153,6 +155,9 @@ class Controller:
         self.received = None
         self.pose_error = 'no pose received'
         self.sequence = 0
+        self.fault_sequence = 0
+        self.last_pose_fault = ''
+        self.valid_pose_samples = 0
         self.yaw_total = 0.0
         self.measured_linear = math.inf
         self.measured_angular = math.inf
@@ -164,6 +169,9 @@ class Controller:
         self.cross_track = 0.0
 
     def invalidate(self, reason):
+        self.fault_sequence += 1
+        self.last_pose_fault = reason
+        self.valid_pose_samples = 0
         self.pose_error = reason
         if self.goal is not None and self.outcome is None:
             self.finish(POSE_INVALID, reason)
@@ -193,6 +201,7 @@ class Controller:
             self.yaw_total = pose.yaw
         self.pose, self.stamp, self.received = pose, stamp, now
         self.sequence += 1
+        self.valid_pose_samples += 1
         # An interrupted goal remains terminal even when the next pose is valid.
         self.pose_error = ''
         return True

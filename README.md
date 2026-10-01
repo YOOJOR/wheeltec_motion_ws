@@ -4,12 +4,15 @@ ROS 2 Humble 下的相对直行和原地转向接口：FAST-LIO 位姿 → 底�
 
 当前 main 的第一台车配置已应用响应参数试调，实车效果待用户确认；对比与回退见 [操作手册](docs/OPERATIONS.md)。
 
+2026-10-01 当前 main 新增持续速度导航模式，用于 Co-NavGPT2 周期性更新底盘速度；Action 与导航互斥，停止/失效后不重放旧请求。接口、时间戳与最小接入示例见 [导航说明](docs/NAVIGATION.md)。本次仅完成速度接口和隔离验证，完整自主探索待后续接入。
+
 **后续开发先读 [阶段总结](docs/STAGE_SUMMARY.md)**。它记录当前状态、接口、实车参数、已验证范围、已知问题和下一步；无需从历史对话或原始日志恢复上下文。
 
 | 文件 | 用途 |
 | --- | --- |
 | [docs/STAGE_SUMMARY.md](docs/STAGE_SUMMARY.md) | 后续工作的统一上下文入口 |
 | [docs/OPERATIONS.md](docs/OPERATIONS.md) | 日常启动、动作调用、参数调整与故障排查 |
+| [docs/NAVIGATION.md](docs/NAVIGATION.md) | 持续速度导航契约、Co-NavGPT2 适配与失效停止 |
 | [docs/WORKSPACE_SETUP.md](docs/WORKSPACE_SETUP.md) | 第二台车从源码到编译的复刻步骤；部署为 `~/workspace/README.md` |
 | [docs/CALIBRATION.md](docs/CALIBRATION.md) | 离线旋转录包标定工具 |
 | [docs/VALIDATION.md](docs/VALIDATION.md) | 当前版本验证摘要 |
@@ -58,7 +61,7 @@ bash scripts/build_and_test.sh
 
 ## 仓库范围
 
-- `src/wheeltec_motion_interfaces`：ExecuteMotion Action 定义。
+- `src/wheeltec_motion_interfaces`：ExecuteMotion Action、MotionStatus 定义。
 - `src/wheeltec_motion_control`：控制器、CLI、离线标定和测试。
 - `scripts`：构建检查、两种启动管理方式、被动延迟诊断。
 - `docs`：当前维护说明；旧逐次开发日志和实验数据已归档到仓库外。
