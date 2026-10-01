@@ -1,5 +1,11 @@
 # 当前验证摘要
 
+## 2026-10-01：厂家功能包只读追踪
+
+- 从桌面常用指令核对厂家 src/install 包索引、launch/run 入口、相机与车型 Nav2 配置；除 qt_ros_test 外，指令中的去重入口均找到安装入口，包含嵌套 launch。
+- 核对 Astra 源码、整车/EKF/TF、RTAB 同步与深度转扫描、Nav2 输出、RRT 目标转发、HSV/PID 跟随；结论见 FACTORY_CAPABILITIES。
+- 仅为静态源码/配置审计，不是 ROS 运行、算法性能或实车验收；未启动节点、打开相机、发送速度或修改厂家/第三方工程。文档经 Git diff 空白检查。
+
 ## 2026-10-01：当前相机识别与短时读流
 
 - USB/sysfs 确认 ORBBEC / ASTRA S、2bc5:0402、480 Mb/s；RealSense 枚举无设备。使用现有 OpenNI SDK 2.3.0.85 查询固件 5.8.22。

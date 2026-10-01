@@ -10,6 +10,8 @@
 
 2026-10-01 相机检查：本机已连接 **Orbbec ASTRA S**（2bc5:0402，USB 2.0），D455 仍未连接。已有 OpenNI SDK 可读彩色＋深度 VGA 约 29 fps，HD 彩色也可输出；短距结构光的标称范围为 0.4–2 m。可先推进室内 RGB-D 软件接入，但真实覆盖、内参/配准/时间同步及相机外参/TF 尚未验收，不能直接套用 D455 启动脚本或参数。详情见 [CAMERA_ASSESSMENT](CAMERA_ASSESSMENT.md)。
 
+2026-10-01 厂家功能链路追踪：桌面相机命令读取 camera_mode=astra，默认 RGB-D VGA/30 fps，未开启深度到彩色配准和设备同步；单独相机入口不接通底盘 TF。厂家存在二维 SLAM/Nav2、RTAB、RRT 和跟随入口，RTAB pure3d 仍使用轮式 EKF，导航使用深度转 LaserScan。厂家速度输出、定位链和更高限速配置不能直接叠加现有控制栈。只读审计与复用步骤见 [FACTORY_CAPABILITIES](FACTORY_CAPABILITIES.md)，未启动厂家整车或运动功能。
+
 这不是完整自主导航系统：没有路径规划、障碍检测、避障、旧地图重定位或多车协作。尚未完成总体规划 M1 的长期定位验收，也未完成 M2 的完整 TF/重复精度验收。当前是 **M2 控制适配部分已实现、整体仍进行中**，不能把基础动作成功写成 Co-NavGPT2 baseline 已跑通。
 
 用户已经明确决定：
