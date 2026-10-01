@@ -1,5 +1,10 @@
 # 版本记录
 
+## 2026-10-01 — 已连接相机识别与能力检查
+
+- 确认本机 ASTRA S 与可用 RGB-D 模式，对比计划 D455；记录短距/视野差异、有效深度和同步验收边界。
+- 更新当前硬件事实：可先推进 ASTRA S 室内 RGB-D 接入，D455 尚未连接；未改相机启动配置或运动代码。
+
 ## 2026-10-01 — 持续速度导航接口（main 扩展）
 
 - 新增 TwistStamped 导航输入、SetBool 启用/退出、MotionStatus；IDLE/ACTION/NAVIGATION 互斥，同一 20 Hz 输出源，保留原相对 Action 的停稳语义。
