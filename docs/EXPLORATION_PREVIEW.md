@@ -1,0 +1,184 @@
+# 单车探索预览：系统现状、使用方法与验收
+
+更新：2026-10-02。当前目标是先用 ASTRA S 推进 Co-NavGPT2 实机 baseline，前沿选择暂用随机策略，不接入 VLM。本文是当前入口，完整接口细节分别见 [相机接口](CAMERA_INTERFACE.md)、[持续速度导航](NAVIGATION.md) 和 [阶段总结](STAGE_SUMMARY.md)。
+
+## 当前到哪一步
+
+目前可以运行**只读探索预览**：接收 RGB-D 和 FAST-LIO 位姿，构建有界二维地图，选择可达前沿，调用锁定版本的 Co-NavGPT2 FMM，输出前进、左转、右转或停止的建议。程序发布地图、目标与诊断信息，**没有速度发布者，也不创建运动客户端**。它不会自行启动相机、雷达、串口或控制器。
+
+| 部分 | 当前事实 | 还需要什么 |
+| --- | --- | --- |
+| 底盘控制 | 相对运动 Action 和持续速度接口已实现；原动作有用户初步实车反馈 | 本轮新规划与实车运动尚未联合验收 |
+| ASTRA S | 独立 RGB-D 接口此前完成真实静止取流，默认相机为奥比 | 内参文件归属、RGB/深度配准和安装外参验收 |
+| D455 | 独立相机接口、SDK 与工具已准备 | 目前随意放置；安装和外参未确定，本阶段不使用 |
+| 位姿配对 | 按深度源时间匹配 FAST-LIO，检查时效与跳变 | 真实数据的配对覆盖和坐标方向 |
+| 地图与随机探索 | 合成输入及隔离 ROS 数据链已验证；输出可查看 | 实车地面/墙体投影、地图一致性、探索效率 |
+| FMM | 复用官方固定版本的规划模块，检查短期目标可达性 | 实车地图上的规划行为 |
+| 控制出口 | `DecisionBridge` 已准备，并接真实控制代码做隔离测试 | 预览入口尚未接通运动；先完成静止验收，再由用户进行试车 |
+| 语义目标 | 本地模型权重已部署；新增可选本地检测/分割适配 | 新预览入口的真实识别准确度、完整模型链与耗时尚未验收 |
+| VLM / 多车 | 本阶段关闭 | 后续独立接入 |
+
+因此，当前结论是“探索软件链可预览”，不能写成“Co-NavGPT2 实机自主导航已经跑通”。本轮开发没有启动硬件或发送实车运动指令。
+
+## 运行逻辑和复用边界
+
+```text
+已运行的 Astra 驱动 → 自研 RGB-D 原子观测 ─┐
+已运行的 FAST-LIO → /Odometry ─────────┤
+                                      ↓ 深度时间配对 + 显式外参
+                              世界 XY 地图 / 可达前沿
+                                      ↓ 随机选择前沿
+                            官方 FMM → 短期目标 / 方向
+                                      ↓
+                        只读决策 + 地图 + 目标 + 记录
+```
+
+新包为 `src/wheeltec_exploration`。不运行原版 Go2/ZMQ 实车入口，不导入原版 Agent/VLM。官方来源锁定为 `891ba09959278b666ef01a7f8b6c64f8fe8436cc`，只加载未修改的 `utils/fmm_planner.py`；其余配对、世界 XY 地图、前沿管理和 ROS 预览是本车适配代码。它并非完整复刻了原版所有建图、语义评分和协作逻辑。
+
+地图以首次有效底盘世界位置为中心，默认 12 m × 12 m、5 cm 栅格，有明确边界。深度以米反投影，依据相对底盘地面参考点的高度区分地面和障碍；已观察障碍会阻止射线将其后方标为空闲。障碍按暂定车体半径和余量膨胀，FMM 只使用底盘所在的已知可达区域。未知区域不能直接作为可通行区域，没有可达前沿时输出停止建议。
+
+随机是在“可达的已知区域边缘”中选择目标，不是随机给底盘转向。目标仍可用时保留，长期无进展会暂时排除；随机种子用于复现。地图是简化、累计的二维栅格：没有动态障碍清除、完整三维语义融合、回环后地图修正、悬崖/坑洞检测或独立雷达避障。这些限制会影响真实场景使用。
+
+处理循环名义为 10 Hz，订阅回调单独运行，只消费最新观测，旧观测不重复建图。没有新输入时不生成新的运动决策时间戳。源图像年龄或处理时间超过 0.3 s 时输出 `PROCESSING_EXPIRED` 和零速度建议。该数值与运动接口 0.3 s 指令有效期对应，不是物理制动时间。
+
+## 相机外参现在采用什么
+
+计算关系为：
+
+```text
+T_world_base   = T_world_body × T_body_base
+T_world_camera = T_world_base × T_base_camera
+```
+
+`body` 是 FAST-LIO 的 IMU 参考点；本项目底盘参考点为地面上的有效旋转中心。世界平面使用 ROS 的 X/Y，光学相机轴为 X 向右、Y 向下、Z 向前。规划器输出世界 XY 的目标，控制请求则必须是底盘坐标系的速度，不能把世界方向直接填进 Twist。
+
+预览 YAML 暂用厂家 senior_mec_bs 的 `base_footprint → camera_link` 平移 `[0.16083, 0.00075, 0.0897]` m，加相机光学轴旋转。这包含两项**尚未验证的假设**：厂家 `base_footprint` 与本项目底盘控制参考点一致；`camera_link → 彩色光学原点` 没有额外平移/安装偏转。SDK 无效外参的零值回退不等于这些假设已被物理测量证实。
+
+因此配置保留 `confirmed: false`，每条诊断都会说明来源和未确认状态。这个暂定矩阵只允许做静止预览，不绕过通用 `PosedRGBDReader` 对确认外参的要求。程序也不发布 TF，写一个 frame 名称不代表 TF 链已存在。D455 的 `base_from_camera` 保持空值，选择 D455 做世界预览会明确拒绝；其独立 RGB-D 数据接口仍保留。
+
+还须核验深度投影使用的内参/光学原点是否与接口标注一致，以及深度与彩色是否真正配准。现有两份 YAML 的相同矩阵和统一 frame 名称不能证明这件事，语义掩码选深度尤其依赖它。
+
+## 不在车边时可以运行的检查
+
+以下命令不打开设备，也不发送速度：
+
+```bash
+cd ~/workspace/wheeltec_motion_ws
+bash scripts/start_exploration_preview.sh --check
+bash scripts/start_exploration_preview.sh --demo --steps 300
+```
+
+`--check` 核对默认配置、安装依赖和官方 FMM 来源。`--demo` 在数值生成的房间中模拟 RGB-D、位姿和运动，输出位于 `runtime_logs/exploration/demo/`：
+
+- `report.json`：输入来源、决策分布、处理时间及 `motion_output: false`。
+- `map.png`：白为空闲、黑为障碍、灰为未知；图像上方对应世界 +Y。
+- `map.npz`：栅格、原点和分辨率；`simulated_trajectory.npy`：模拟轨迹。
+
+模拟的位移和地图只能证明该输入下程序运行，不能代替真实相机、车体运动或避障验收。
+
+完整开发检查：`bash scripts/build_and_test.sh`。它编译本仓库包，原控制/相机测试在独立 ROS 域运行，新探索测试默认使用域 182，合成位姿和测试话题，不启动厂家设备。需要已有 `conavgpt2_ws/.venv`，其中有 FMM 所需 `skfmm`；系统 Python 没有这一依赖，不要把任意终端的 `python` 混用。
+
+## 到车边后：先做静止预览
+
+下面是**用户在车边执行的后续步骤，本轮没有执行**。先确认相机固定、车辆周围安全，ASTRA S 为本次使用设备。第一次不要启用导航、提交 Action 或运行其他速度源。
+
+1. 如已有正常运行的相机和 FAST-LIO，复用它们。否则按照 [OPERATIONS](OPERATIONS.md) 启动已有定位链，并在另一个终端执行 `bash ~/workspace/wheeltec_motion_ws/scripts/start_astra_rgbd.sh --start`。相机专用脚本只运行相机驱动和适配器。若使用 `start_robot_tabs.sh`，它还会启动通信和控制器，控制器在空闲时持续输出零速度；预览不改变其模式。不要重复启动同一套节点。
+2. 启动一分钟只读预览：
+
+```bash
+cd ~/workspace/wheeltec_motion_ws
+bash scripts/start_exploration_preview.sh --start --duration 60
+```
+
+3. 查看诊断和地图：
+
+```bash
+source /opt/ros/humble/setup.bash
+source ~/workspace/wheeltec_motion_ws/install/local_setup.bash
+ros2 topic echo /wheeltec_exploration/decision
+```
+
+也可在 RViz 中将 Fixed Frame 设为 `camera_init`，添加 Map `/wheeltec_exploration/map`，添加 Pose `/wheeltec_exploration/goal` 和 `/wheeltec_exploration/short_term_goal`。这些目标消息是预览，故障后 RViz 可能保留旧 Pose；是否有效以 `/decision` 的最新 reason、epoch 和时间为准。地图每秒发布一次，决策约 10 Hz；不提供完整 TF 树。
+
+退出用 Ctrl+C 或等待 duration 结束。退出会写 `reason: EXITED`，此前最后一条结果保存在 `last_decision`；这不表示进程仍在运行。实时文件在 `runtime_logs/exploration/latest/`，不要把退出后留下的地图当成新观测。一次只运行一个预览实例；相机和定位仍由它们各自的终端管理。
+
+## 怎么判断静止预览是否通过
+
+先判断观测和几何，再判断规划；出现 `PLANNED` 只能说明算法算出了建议。
+
+| 要观察的内容 | 可以接受的现象 | 不符合时的处理 |
+| --- | --- | --- |
+| 图像与深度 | RGB/深度对应同一物体，边缘基本重合，米制距离与实测一致 | 核验现有内参文件、设备归属、配准和有效范围 |
+| 世界投影 | 前方墙体在底盘前方；左右方向正确；地面接近底盘参考点 Z | 核验光学轴、相机高度/偏转、两个底盘参考点差异 |
+| 静止地图 | 墙体位置稳定，没有随静止噪声明显铺成多条墙或侵入车体 | 检查位姿新鲜度、配对时间、外参和深度质量 |
+| 空闲与障碍 | 实际墙/家具落在障碍，未知区保留灰色，墙后不被当成已知空闲 | 保持预览，定位问题后再继续 |
+| 决策 | 目标和短期目标在已知可达区域；墙/窄通道阻断时不会直穿 | 检查地图及暂定车体半径，不能靠调大速度解决 |
+| 处理时效 | source_age_sec / processing_sec 经常低于 0.3 s，没有持续失效 | 查明取流、时间同步和处理瓶颈；不无限放宽超时 |
+
+Astra 的已知范围为 0.4–2 m，近盲区及低有效深度覆盖可能造成停止建议，不能把无深度直接解释为空地。暂定 footprint_radius=0.25 m、clearance=0.05 m 和高度阈值不是已测车体包络，需要现场测量确认。地图通过前不要把 `confirmed` 改成 true；布尔值记录验收结论，不能替代验收本身。
+
+建议保留一段静止数据、实际场景照片/距离及预览文件，注明相机型号、安装位置和问题现象，便于下一轮定位问题。
+
+## 状态、故障与恢复
+
+| reason | 含义和当前行为 |
+| --- | --- |
+| `PLANNED` | 这一新观测产生有效建议；预览仍不发送速度 |
+| `WAITING` / `NO_NEW_OBSERVATION` / `NO_TIME_MATCHED_POSE` / `WAITING_FOR_POSE` | 等待新帧或可配对位姿，不重发旧决策 |
+| `NO_REACHABLE_FRONTIER` / `BASE_NOT_TRAVERSABLE` | 没有可达目标或底盘所在栅格不可通行，建议停止 |
+| `FRONTIER_REACHED` / `FMM_NO_VALID_STEP` | 当前前沿结束或无有效短期步，当前建议为停止 |
+| `PROCESSING_EXPIRED` | 本次处理/源数据过期，建议为零；下一新帧可重新预览 |
+| 位姿跳变/失效、输入断流、`MAP_BOUNDARY`、`PROCESSING_ERROR` | 故障锁存，清地图和目标，不能靠数据恢复自动延续旧任务 |
+| `TARGET_REACHED` / `TARGET_APPROACH_REACHED` | 可选语义模式的几何停止条件，不能证明实车识别或任务成功 |
+
+输入有效性沿用相机的源时间及单调接收超时 0.5 s、超前容差 0.1 s；位姿匹配窗口 ±0.05 s、样本缓存 16 条，位姿新鲜度 0.5 s。位姿连续性使用已有 reader 门槛：平移跳变 0.5 m、三维转角 0.8 rad。控制节点自身还有独立定位与定时器保护，未放宽现有门槛。
+
+异常原因查清、输入恢复后，显式丢弃旧地图和任务：
+
+```bash
+ros2 service call /wheeltec_exploration/reset std_srvs/srv/Trigger '{}'
+```
+
+服务回应表示已排队，循环下一次处理会清空输入缓存和地图并增加 `epoch`。等待新 epoch 的新观测，不能拿旧目标继续导航。FAST-LIO 重启改变 `camera_init` 原点后也必须这样处理；若 ROS 时钟发生回退，应重启预览及相关消费者，重新建立时间基准。
+
+## 配置和可选本地模型
+
+默认配置为 `src/wheeltec_exploration/config/astra_preview.yaml`；`--start --config /绝对路径/自定义.yaml` 可覆盖。相机安装矩阵必须按设备独立配置，不能把奥比矩阵复用给 D455。
+
+| 配置 | 默认与意义 |
+| --- | --- |
+| camera / odom_topic / prefix | astra_s、/Odometry、/wheeltec_exploration |
+| body_from_base_* | 保留第一台车既有偏移和轴向，未调运动参数 |
+| resolution / goal_tolerance | 0.05 m / 0.25 m；首版固定，匹配官方 FMM 内部栅格单位，改值会拒绝 |
+| size_m / pixel_stride | 12 m / 8；有界地图与深度采样密度 |
+| obstacle_min/max_height / floor_tolerance | 0.08–1.3 m / 0.08 m，均相对底盘地面参考点 |
+| footprint_radius / clearance | 0.25 m / 0.05 m，暂定且待测 |
+| frontier_min_cells / goal_min_distance | 3 格 / 0.45 m，过滤过小/过近候选 |
+| goal_no_progress_sec / goal_blacklist_sec | 10 s / 15 s，无进展及暂时排除时间 |
+| turn_threshold / forward_speed / turn_speed | 0.35 rad / 0.10 m/s / 0.25 rad/s，预览建议；仍受本车 0.15 / 0.35 上限约束 |
+| target_approach_distance / seed | 0.6 m / 1，语义接近参考值与随机种子 |
+
+默认 `geometry_only` 不加载检测模型。可选 `--perception --target chair --device cuda` 加载已有本地 YOLO-World、CLIP 和 MobileSAM，检测掩码的有效深度用于估计目标位置，优先选已知可达区域内的接近点；未见可用目标时继续随机前沿。它仍然只读，不调用 VLM，也不下载模型。**当前新增模型运行分支未做真实图像/性能验收，首次静止验收先使用默认几何模式。** 模型超过 0.3 s 的结果会被标为过期，不能通过循环重发旧决定维持运动。
+
+## 后续运动接入契约
+
+当前没有可直接驱车的探索 CLI。准备好的 `DecisionBridge` 只在外参和内参/配准验收被明确确认后允许显式 arm；`NavigationClient` 的速度必须与规划建议一致，不一致会停车并拒绝，避免显示 0.10 m/s 却请求别的速度。隔离测试使用合成位姿、测试服务和 `/exploration_test/synthetic_output`。
+
+后续现场接入仍须按 [NAVIGATION](NAVIGATION.md) 使用 `/wheeltec_motion/navigation/cmd_vel`，由现有控制节点唯一发布 `/cmd_vel`。Action 执行时拒绝启用导航，导航中拒绝新的 Action；主动 stop 或失效会清缓存并退出导航。恢复需要显式重新启用和新的有效请求。
+
+准备进入 VLM 请求、长计算或其他阻塞等待前必须主动 stop。既不重发旧决策，也不单靠延长指令有效期维持运动。软件输出零速度只表示程序发出停止请求，真实停车距离和时间仍须用户现场测量。
+
+## 测试能证明什么
+
+| 输入/操作 | 检查的实际结果 | 能证明的范围与限制 |
+| --- | --- | --- |
+| 已知像素、米制深度和刚体变换 | 点落在预期世界方向和栅格 | 数学与单位约定；不证明真实外参准确 |
+| 已知墙体、天花板、未知区和断开的空闲区 | 墙后不清空，天花板不当作地面，未知/不可达区不供 FMM 通行 | 人为场景下的地图规则；不证明真实深度质量或安全避障 |
+| 连续合成 RGB-D/位姿 | 地图、随机目标、官方 FMM 和方向建议连续产生 | 软件数据链接通；不等于实车探索效率 |
+| 重复旧帧、断流、位姿跳变、故意延迟计算 | 不重复建图，输出零建议；严重故障清地图并锁存，reset 后需新数据 | 这些故障的程序行为；不证明所有现场故障已覆盖 |
+| 隔离域内真实 ROS 消息及控制节点 | 可查看/断言实际速度消息、服务与状态；停止后输出零，限制有效 | ROS 与控制输出契约；没有串口/轮子，不证明物理停车 |
+| 原控制与相机回归 | 新包没有破坏已有接口行为 | 已列用例的回归；不是全场景可靠性保证 |
+
+测试数量只用于发现漏跑和记录覆盖，不是成熟度分数。具体结果、命令、输入来源与证据目录见 [VALIDATION](VALIDATION.md)。
+
+下一次现场工作的顺序是：核验 Astra 标定与安装 → 静止核验投影/地图 → 确认参考点及车体包络 → 用户小范围运动验收 → 再考虑 D455 固定安装及 VLM。当前先完成前两步。

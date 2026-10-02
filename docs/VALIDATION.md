@@ -1,5 +1,37 @@
 # 当前验证摘要
 
+## 2026-10-02：只读随机探索软件链
+
+本轮边界：用户不在车边，禁止车辆运动；D455 随意放置，不用于调试。只使用合成图像/深度/位姿及隔离 ROS 域，没有启动相机、雷达、厂家串口，没有向实车 `/cmd_vel` 或导航输入发布运动请求，也没有 VLM 调用。保留实车 motion YAML、厂家和第三方定位源码。
+
+### 实际验证结果与含义
+
+| 输入与操作 | 实际检查结果 | 证明什么 / 不证明什么 |
+| --- | --- | --- |
+| 已知深度、内参、光学轴和刚体变换 | 反投影方向、米制尺度、世界位置和 XY 栅格一致 | 数学契约；不能证明厂家外参或现有内参文件物理正确 |
+| 人造遮挡墙、天花板、未知区、断开的空闲区 | 射线保留顺序，墙后不清为空闲；天花板不证明地面可通行；未知和断开区域不供规划通行 | 这些地图规则；不能证明动态避障、坑洞检测或真实深度质量 |
+| 合成房间 300 帧，64×48 RGB-D，数值更新虚拟位姿 | 全部产生 PLANNED；132 次前进建议、168 次左转建议；6565 空闲格、120 障碍格；132/168 是虚拟决策，不是车体动作。处理均值 0.02368 s、最大 0.05806 s | 建图→随机前沿→官方 FMM→方向链可以运行并观察模拟墙；不证明高分辨率/模型实时性、探索效率或安全运动 |
+| 相同种子重复运行；固定目标配相反车头方向；长期无进展 | 相同输入复现，左右转方向符合约定，目标保持及暂时排除按规则执行 | 有限场景下的决策行为；不证明实际转角或覆盖率 |
+| 旧观测、地图边界、位姿跳变/断流；显式 reset | 旧帧不重复建图；严重故障清地图并锁存；新 epoch 需新数据 | 不自动延续旧地图/任务；不证明所有现场定位异常都已覆盖 |
+| 在隔离 ROS 输入处理中故意增加 0.32 s 延迟 | `/decision` 实际收到 PROCESSING_EXPIRED，linear_x/angular_z 均为零 | 过期结果被丢弃；这里是预览字段，不是底盘制动 |
+| 真实 MotionNode + NavigationClient + DecisionBridge，合成 Odometry，独立测试话题；另用模拟客户端注入桥接故障 | `/exploration_test/synthetic_output` 实际收到正向速度及 stop 后零速度，输出在本车上限内；桥接单元测试验证旧帧/epoch/客户端故障会解除 arm，速度与预览不一致会拒绝 | 控制接口与软件输出，以及所注入的桥接异常；没有串口/轮子，不证明物理响应或停车时间 |
+| 无输入安装入口启动 1 s 并退出 | 默认 Astra；WAITING/零建议；退出记录 EXITED、processed=0，没有启动硬件 | 安装/入口/生命周期；不是相机取流验收 |
+
+早期 80 帧 demo 未观察到障碍，因此当时只能证明基本数据链接通；扩展到 300 帧后观察到模拟墙。虚拟位移约 0.906 m 仅由数值运动学计算，不能写为实车移动。当前随机策略的覆盖率、目标变动频率及绕障效果没有量化验收。
+
+可选本地模型分支的掩码→世界点、语义接近目标/无进展/重置逻辑已用合成几何验证；本轮没有运行新分支的完整 YOLO/MobileSAM 推理或真实识别，不将此前模型部署检查替代本分支验收。
+
+### 命令、覆盖记录与证据位置
+
+- `bash scripts/build_and_test.sh`：5 个自研包构建安装通过；控制 61、相机 49、探索 35，汇总 145，0 errors/failures/skipped；启动管理 15 及安装入口 smoke 通过。数字用于确认未漏跑，判断依据为上表行为和测试源码中的实际断言。
+- 原控制回归涵盖同速持续更新、运动中变更、最新请求优先、源/接收超时、旧会话过滤、Action 互斥、主动/失效停止、加速度与速度上限，以及原相对 Action 到达/停稳/结果语义。真实控制节点和消息均仅使用合成位姿与测试输出。
+- `bash scripts/start_exploration_preview.sh --check`：配置和锁定官方 FMM 检查通过；其 5 cm 栅格和 25 cm 到达单位在首版固定，配置改动会明确拒绝。
+- `bash scripts/start_exploration_preview.sh --demo --steps 300 --output runtime_logs/exploration/demo300`：上述模拟报告、地图与轨迹已生成。
+- `ROS_DOMAIN_ID=183 ROS_LOCALHOST_ONLY=1 bash scripts/start_exploration_preview.sh --start --duration 1 --output runtime_logs/exploration/no-input-smoke`：无输入入口正常退出。沙箱限制网络接口/UDP，ROS 提示 Operation not permitted；同进程隔离 ROS 测试通过，不能据此推断实车跨进程/网络 DDS 性能。
+- 完整回归：`runtime_logs/validation/20261002-174042-7/`；总输出 `runtime_logs/exploration-full-validation.log`。新测试 XML：`build/wheeltec_exploration/pytest.xml`。模拟与无输入记录：`runtime_logs/exploration/demo300/`、`runtime_logs/exploration/no-input-smoke/`。这些原始输出忽略 Git。
+
+下一步现场证据应来自 Astra 标定/配准检查、静止世界地图和用户运动验收；操作顺序、通过/失败现象及剩余限制见 [EXPLORATION_PREVIEW](EXPLORATION_PREVIEW.md)。本轮结论为只读探索软件链通过已列验证，完整 Co-NavGPT2 实机自主探索未验收。
+
 ## 2026-10-01：自研 Astra RGB-D 接口
 
 - `bash scripts/build_and_test.sh`：4 个自研包编译安装通过；原控制 61 项、启动管理 15 项、安装后 Action/导航禁用入口与 CLI/关闭 smoke 通过。相机后续扩展用独立域 177/178 复验，最终 `python3 -m pytest src/wheeltec_rgbd/test -q --junitxml=build/wheeltec_rgbd/pytest.xml` 为 26 passed；`colcon test-result --verbose` 为 87 tests，0 errors/failures/skipped。

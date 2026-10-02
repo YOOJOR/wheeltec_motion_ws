@@ -10,12 +10,15 @@ ROS 2 Humble 下的相对直行和原地转向接口：FAST-LIO 位姿 → 底�
 
 **后续开发先读 [阶段总结](docs/STAGE_SUMMARY.md)**。它记录当前状态、接口、实车参数、已验证范围、已知问题和下一步；无需从历史对话或原始日志恢复上下文。
 
+2026-10-02 新增 [单车探索预览文档](docs/EXPLORATION_PREVIEW.md)：RGB-D / FAST-LIO 配对、世界 XY 地图、随机可达前沿、官方 FMM 和方向建议已完成合成及隔离 ROS 验证。入口只发布地图和诊断，没有运动输出、不调用 VLM。默认奥比，D455 保留独立接口；厂家暂定相机外参用于只读预览，尚未物理确认。
+
 | 文件 | 用途 |
 | --- | --- |
 | [docs/STAGE_SUMMARY.md](docs/STAGE_SUMMARY.md) | 后续工作的统一上下文入口 |
 | [docs/OPERATIONS.md](docs/OPERATIONS.md) | 日常启动、动作调用、参数调整与故障排查 |
 | [docs/CAMERA_INTERFACE.md](docs/CAMERA_INTERFACE.md) | 相机单独启动、RGB-D 契约和新鲜观测读取 |
 | [docs/NAVIGATION.md](docs/NAVIGATION.md) | 持续速度导航契约、Co-NavGPT2 适配与失效停止 |
+| [docs/EXPLORATION_PREVIEW.md](docs/EXPLORATION_PREVIEW.md) | 当前探索系统、只读运行、验证含义与用户现场验收步骤 |
 | [docs/WORKSPACE_SETUP.md](docs/WORKSPACE_SETUP.md) | 第二台车从源码到编译的复刻步骤；部署为 `~/workspace/README.md` |
 | [docs/CALIBRATION.md](docs/CALIBRATION.md) | 离线旋转录包标定工具 |
 | [docs/VALIDATION.md](docs/VALIDATION.md) | 当前版本验证摘要 |
@@ -66,6 +69,8 @@ bash scripts/build_and_test.sh
 
 - `src/wheeltec_motion_interfaces`：ExecuteMotion Action、MotionStatus 定义。
 - `src/wheeltec_motion_control`：控制器、CLI、离线标定和测试。
+- `src/wheeltec_rgbd*`：两种相机的独立观测、状态和位姿配对接口。
+- `src/wheeltec_exploration`：只读地图/随机前沿/FMM 预览；依赖已部署 conavgpt2_ws 环境。
 - `scripts`：构建检查、两种启动管理方式、被动延迟诊断。
 - `docs`：当前维护说明；旧逐次开发日志和实验数据已归档到仓库外。
 

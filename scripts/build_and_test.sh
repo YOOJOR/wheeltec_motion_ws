@@ -22,11 +22,12 @@ colcon build --base-paths src --symlink-install --event-handlers console_direct+
 source install/local_setup.bash
 colcon test --packages-select wheeltec_motion_control wheeltec_rgbd --event-handlers console_direct+ \
   --return-code-on-test-failure 2>&1 | tee "$WHEELTEC_VALIDATION_DIR/test.log"
+bash scripts/test_exploration.sh 2>&1 | tee "$WHEELTEC_VALIDATION_DIR/exploration-tests.log"
 colcon test-result --verbose 2>&1 | tee "$WHEELTEC_VALIDATION_DIR/test-result.log"
 python3 - <<'PY'
 from pathlib import Path
 import xml.etree.ElementTree as ET
-for package in ('wheeltec_motion_control', 'wheeltec_rgbd'):
+for package in ('wheeltec_motion_control', 'wheeltec_rgbd', 'wheeltec_exploration'):
     files = list((Path('build') / package).rglob('*.xml'))
     count = sum(int(s.attrib.get('tests', 0)) for f in files
                 for s in ET.parse(f).getroot().iter('testsuite'))
