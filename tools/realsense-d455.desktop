@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=RealSense D455 调试
+Comment=查看 D455 彩色、深度、点云并录制数据
+Exec=bash /home/wheeltec/workspace/wheeltec_motion_ws/scripts/d455_tools.sh --viewer
+Icon=camera-video
+Terminal=false
+Categories=Development;Utility;
+StartupNotify=true

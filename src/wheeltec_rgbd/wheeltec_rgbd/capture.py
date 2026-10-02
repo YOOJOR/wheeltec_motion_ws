@@ -5,6 +5,9 @@ from pathlib import Path
 import time
 import numpy as np
 import rclpy
+import yaml
+from .core import Settings
+from .profiles import camera_profile
 from rclpy.utilities import remove_ros_args
 from .client import RGBDReader, NoFreshFrame
 
@@ -13,14 +16,21 @@ def main(args=None):
     parser = argparse.ArgumentParser()
     parser.add_argument('--duration', type=float, default=5.0)
     parser.add_argument('--output', type=Path)
-    parser.add_argument('--topic', default='/wheeltec_camera/rgbd')
-    parser.add_argument('--status-topic', default='/wheeltec_camera/status')
+    parser.add_argument('--settings', type=Path, help='Adapter YAML: shared frame/depth/freshness settings')
+    parser.add_argument('--camera', choices=['astra_s', 'd455'], default='astra_s')
+    parser.add_argument('--topic', default=None)
+    parser.add_argument('--status-topic', default=None)
     argv = remove_ros_args(args=args)[1:] if args is not None else remove_ros_args()[1:]
     opts = parser.parse_args(argv)
     if not 0 < opts.duration <= 120:
         parser.error('--duration must be in (0,120]')
+    settings = camera_profile(opts.camera).settings
+    if opts.settings:
+        document = yaml.safe_load(opts.settings.read_text())
+        params = next(iter(document.values()))['ros__parameters']
+        settings = Settings(**{k: params[k] for k in vars(settings) if k in params})
     rclpy.init(args=args)
-    reader = RGBDReader(topic=opts.topic, status_topic=opts.status_topic)
+    reader = RGBDReader(topic=opts.topic, status_topic=opts.status_topic, settings=settings, camera=opts.camera)
     start = time.monotonic()
     stamps, deltas, fractions, source_ages = [], [], [], []
     last_stamp, obs = 0, None
@@ -53,7 +63,7 @@ def main(args=None):
                   'adapter_reason': reader.last_status.message if reader.last_status else None,
                   'adapter_values': {v.key: v.value for v in reader.last_status.values}
                                     if reader.last_status else {},
-                  'timestamp_origin': 'driver_host_callback',
+                  'timestamp_origin': next((v.value for v in reader.last_status.values if v.key == 'timestamp_origin'), 'unknown') if reader.last_status else 'unknown',
                   'chassis_extrinsics': 'not_configured'}
         if fresh:
             result.update(color_shape=list(obs.rgb.shape), depth_shape=list(obs.depth_m.shape),

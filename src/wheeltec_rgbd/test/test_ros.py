@@ -186,3 +186,36 @@ def test_posed_rgbd_end_to_end(h):
         h.executor.remove_node(reader)
         reader.destroy_node()
         h.source.destroy_publisher(pub)
+
+
+def test_selected_camera_reads_only_its_own_topic(h):
+    import copy
+    from wheeltec_rgbd_interfaces.msg import RGBDFrame
+    from wheeltec_rgbd.profiles import camera_profile
+    reader = RGBDReader(camera='d455')
+    h.executor.add_node(reader)
+    profile = camera_profile('d455')
+    pub = h.source.create_publisher(RGBDFrame, profile.topic, latest_qos())
+    try:
+        h.wait(lambda:pub.get_subscription_count() > 0)
+        h.send()
+        h.wait(lambda:h.reader.latest is not None)
+        assert reader.latest is None  # Astra output never enters selected D455 reader.
+        original = h.reader.latest
+        pair = make_pair(stamp=h.source.get_clock().now().nanoseconds, delta=0)
+        for item in pair:
+            item.header.frame_id = profile.settings.expected_frame
+        msg = RGBDFrame()
+        msg.header = copy.deepcopy(pair[0].header)
+        msg.color, msg.depth, msg.color_info, msg.depth_info = pair
+        msg.sequence, msg.rectified = 1, True
+        msg.calibration_source = 'synthetic_d455'
+        pub.publish(msg)
+        h.wait(lambda:reader.latest is not None)
+        assert reader.read_latest().calibration_source == 'synthetic_d455'
+        assert h.reader.latest.stamp_ns == original.stamp_ns
+        assert reader.settings.expected_frame == profile.settings.expected_frame
+    finally:
+        h.executor.remove_node(reader)
+        reader.destroy_node()
+        h.source.destroy_publisher(pub)

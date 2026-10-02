@@ -232,3 +232,7 @@ ros2 launch wheeltec_motion_control motion_control.launch.py \
 ### RGB-D 与定位的只读接入
 
 上层可使用 `wheeltec_rgbd.posed.PosedRGBDReader` 同时读取相机观测和 FAST-LIO 对应时刻位姿。必须先提供并确认相机光学坐标系到车体的实测外参；目前不提供用占位值启动真实建图的命令。构造参数、坐标链、定位故障后的地图清理及重置要求见 [CAMERA_INTERFACE](CAMERA_INTERFACE.md) 的位姿衔接部分。该接口只订阅数据，不启动运动、相机或定位进程。
+
+### D455 相机入口
+
+连接 D455 后运行 `bash ~/workspace/wheeltec_motion_ws/scripts/start_d455_rgbd.sh --start`，只启动相机及 RGB-D 适配器。先退出占用同一 D455 的 Viewer/调试工具，Ctrl+C 关闭。采集检查传 `--camera d455`；奥比为默认 baseline 相机。完整步骤见 [D455_INTERFACE](D455_INTERFACE.md)。D455 安装外参须单独确认，不沿用 Astra 厂家值。

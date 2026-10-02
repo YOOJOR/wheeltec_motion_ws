@@ -145,7 +145,9 @@ def normalize(pair, settings, now_ns):
     rgb = np.ascontiguousarray(rgb).copy()
     metres = image_array(depth).astype(np.float32)
     if depth.encoding == '16UC1':
-        metres *= 0.001
+        # Division preserves exact metre boundaries (6000 mm -> 6.0), avoiding
+        # float32 multiplication rounding an inclusive depth_max out of range.
+        metres /= 1000.0
     valid = np.isfinite(metres) & (metres >= settings.depth_min) & (metres <= settings.depth_max)
     metres[~valid] = np.nan
     if not valid.any():

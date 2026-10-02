@@ -1,5 +1,7 @@
 # 自研 ASTRA S RGB-D 接口
 
+D455 已新增独立启动和配置，继续使用同一 RGBDFrame/Reader 接口，见 [D455_INTERFACE](D455_INTERFACE.md)。奥比入口保持原样且为 baseline 默认；D455 使用独立话题和帧，上层通过 camera 选项选择。
+
 首版 2026-10-01。复用本机已安装的 Astra/OpenNI 底层驱动及现有标定文件，使用自研 wheeltec_rgbd 做配对、校验、深度单位/范围转换及最新观测读取。只启动相机，不启动厂家整车、EKF、跟随、SLAM、Nav2，不发布 /cmd_vel。厂家的完整功能包只作参考。
 
 ## 启动与停止

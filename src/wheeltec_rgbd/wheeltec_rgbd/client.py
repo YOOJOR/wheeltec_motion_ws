@@ -7,8 +7,9 @@ import numpy as np
 from rclpy.node import Node
 from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus
 from wheeltec_rgbd_interfaces.msg import RGBDFrame
-from .core import Settings, FrameError, normalize, stamp_ns
+from .core import FrameError, normalize, stamp_ns
 from .node import latest_qos
+from .profiles import camera_profile
 
 
 class NoFreshFrame(RuntimeError):
@@ -42,10 +43,12 @@ class Observation:
 
 
 class RGBDReader(Node):
-    def __init__(self, topic='/wheeltec_camera/rgbd', status_topic='/wheeltec_camera/status',
-                 settings=None, **kwargs):
+    def __init__(self, topic=None, status_topic=None, settings=None, camera='astra_s', **kwargs):
+        profile = camera_profile(camera)
         super().__init__('rgbd_reader', **kwargs)
-        self.settings = settings or Settings()
+        self.settings = settings or profile.settings
+        topic = profile.topic if topic is None else topic
+        status_topic = profile.status_topic if status_topic is None else status_topic
         self.lock = threading.Lock()
         self.latest = None
         self.received_at = None

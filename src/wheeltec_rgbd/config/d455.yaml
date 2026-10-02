@@ -1,0 +1,15 @@
+/wheeltec_camera/d455/rgbd_adapter:
+  ros__parameters:
+    color_topic: /wheeltec_camera/d455/raw/wheeltec_d455/color/image_raw
+    depth_topic: /wheeltec_camera/d455/raw/wheeltec_d455/aligned_depth_to_color/image_raw
+    color_info_topic: /wheeltec_camera/d455/raw/wheeltec_d455/color/camera_info
+    depth_info_topic: /wheeltec_camera/d455/raw/wheeltec_d455/aligned_depth_to_color/camera_info
+    output_topic: /wheeltec_camera/d455/rgbd
+    status_topic: /wheeltec_camera/d455/status
+    expected_frame: wheeltec_d455_color_optical_frame
+    frame_timeout: 0.5
+    future_tolerance: 0.1
+    sync_tolerance: 0.03
+    # Initial application mask, not a device accuracy or obstacle guarantee.
+    depth_min: 0.4
+    depth_max: 6.0

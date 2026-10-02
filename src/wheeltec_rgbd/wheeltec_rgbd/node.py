@@ -30,6 +30,7 @@ class RGBDNode(Node):
             'depth_info_topic': '/wheeltec_camera/raw/depth/camera_info',
             'output_topic': '/wheeltec_camera/rgbd', 'status_topic': '/wheeltec_camera/status',
             'calibration_source': 'driver_camera_info',
+            'hardware_id': 'astra_s', 'timestamp_origin': 'driver_host_callback',
             'color_calibration_url': '', 'depth_calibration_url': '',
         }
         defaults.update(vars(Settings()))
@@ -45,6 +46,7 @@ class RGBDNode(Node):
         self.sequence = self.accepted = self.rejected = 0
         self.input_counts = {kind: 0 for kind in PairBuffer.kinds}
         self.processing_max_sec = 0.0
+        self.rejection_reasons = {}
         self.last_rx = None
         self.last_source_ns = 0
         self.valid_fraction = 0.0
@@ -103,6 +105,7 @@ class RGBDNode(Node):
         except (FrameError, ValueError, TypeError, BufferError, OverflowError) as exc:
             self.rejected += 1
             self.reason = str(exc) if isinstance(exc, FrameError) else 'INVALID_DATA'
+            self.rejection_reasons[self.reason] = self.rejection_reasons.get(self.reason, 0)+1
             self.last_rx = None
             self.buffer.clear()
             self.health()
@@ -118,14 +121,15 @@ class RGBDNode(Node):
                 self.buffer.clear()
         msg = DiagnosticArray()
         msg.header.stamp = self.get_clock().now().to_msg()
-        status = DiagnosticStatus(name='wheeltec_camera/rgbd', hardware_id='astra_s')
+        status = DiagnosticStatus(name='wheeltec_camera/rgbd', hardware_id=self.get_parameter('hardware_id').value)
         status.level = (DiagnosticStatus.OK if self.reason == 'READY' else
                         DiagnosticStatus.WARN if self.reason == 'WAITING' else DiagnosticStatus.ERROR)
         status.message = self.reason
         status.values = [KeyValue(key=k, value=str(v)) for k, v in {
             'accepted': self.accepted, 'rejected': self.rejected,
+            'rejection_reasons': self.rejection_reasons,
             'valid_depth_fraction': self.valid_fraction,
-            'depth_unit': 'metres', 'timestamp_origin': 'driver_host_callback',
+            'depth_unit': 'metres', 'timestamp_origin': self.get_parameter('timestamp_origin').value,
             'chassis_extrinsics': 'not_configured',
             'calibration_source': self.get_parameter('calibration_source').value,
             'color_calibration_url': self.get_parameter('color_calibration_url').value,

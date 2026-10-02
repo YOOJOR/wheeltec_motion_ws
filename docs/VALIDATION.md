@@ -129,3 +129,14 @@ bash scripts/start_robot_tabs.sh --check
 - 本轮没有重跑 61 项运动或 15 项管理测试，运动代码及配置未改。未启动相机硬件、底盘或 FAST-LIO；只使用本机隔离 ROS 域的合成消息，没有 /cmd_vel 发布者。
 - 首次测试因默认 ROS 日志目录在沙箱只读而失败，随后将 ROS_LOG_DIR 指向仓库忽略的 runtime_logs 后通过；未修改系统权限。构建输出在 runtime_logs/posed-validation-build.log。
 - 真实相机外参、内参设备归属、物理配准、曝光时间同步和世界地图质量均未验收；接口成功不等于自主导航跑通。
+
+## 2026-10-02 D455 工具准备与独立相机接口
+
+- 只读 USB/SDK 检查：D455 8086:0b5c，5 Gbps；固件 5.15.1.55。现有 ros-humble-librealsense2 2.58.4 与 realsense2-camera 4.58.4 已包含 SDK 头文件/库、Viewer 和诊断工具，无需重复安装或替换内核驱动。`d455_tools.sh --check` 通过；Viewer 无缺失动态库，真实 X11 窗口 RealSense Viewer v2.58.4.0 创建成功，测试后关闭。桌面快捷方式已安装并标记可信。
+- `colcon build --packages-select wheeltec_rgbd --symlink-install`：1 包成功。Bash 语法、启动 --show-args 与 git diff --check 通过。
+- 隔离 ROS 域 181、ROS_LOCALHOST_ONLY=1，pytest 相机包：49 passed / 3.56 s（原 43 + 新 6）。包含 D455 深度范围/设备投影、未对齐深度拒绝、默认奥比配置、不同话题/光学帧，以及两种相机的选择端相互隔离。新增边界测试发现 float32 乘 0.001 将 6000 mm 算成略大于 6.0，修正为 /1000 后 inclusive 上界通过。
+- 最终分离版静止验证：独立 ROS 域 180，仅 D455 驱动+自研适配器，10 秒含启动共消费 109 组，约 13.82 Hz；适配器统计 accepted=113、rejected=0，结束 READY；RGB/对齐深度消息同戳，最大源年龄 0.235 s，当前场景应用掩码有效深度平均约 71.1%。输出 frame=wheeltec_d455_color_optical_frame，设备 CameraInfo 来源，无 Astra YAML 覆盖。该域 /cmd_vel 发布者为 0；相机与适配进程均干净退出。原始数据在 runtime_logs/camera/20261002-d455-separated/。
+- 初次共用输出原型曾消费 183 组 / 14.54 Hz，1 次拒绝原因未单独留存；随后增加拒绝原因统计，最终独立输出版本 0 拒绝。最终版本以分离话题和帧记录为准，不把原型验证代替最终结果。
+- 最初真实快照在 Co-NavGPT2 官方 build_full_scene_pcd 函数中生成 15214 个降采样/过滤点，输入 232524 个有效深度像素，点均有限；仅光学坐标系，未附世界位姿。结果在 runtime_logs/camera/20261002-d455-interface/conav_geometry.json。
+- 实际驱动请求并读取 640×480 RGB8/Z16 / 15 Hz，开启 enable_sync/align_depth，禁用 IMU/点云。保留启动时 power_line_frequency 默认值越界告警的事实，取流通过，未改设备固件或厂家/定位代码；本轮也未测曝光同步、深度物理精度或长时稳定性。
+- 未重跑运动/启动管理测试（未改对应源码/配置）。主线默认奥比，D455 为后续切换测试；安装外参、世界建图和完整 baseline 仍待验收。

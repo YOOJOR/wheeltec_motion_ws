@@ -70,3 +70,5 @@ bash scripts/build_and_test.sh
 - `docs`：当前维护说明；旧逐次开发日志和实验数据已归档到仓库外。
 
 仅本仓库上传 GitHub。厂家底盘和第三方传感器/定位源码不纳入；日常读阶段总结与当前手册，旧记录只在用户明确要求排查历史问题时查阅。
+
+D455 现已接入统一 RGB-D 接口，启动、取流验证和 Python 使用见 [D455_INTERFACE](docs/D455_INTERFACE.md)。
