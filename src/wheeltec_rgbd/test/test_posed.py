@@ -94,3 +94,96 @@ def test_ros_odometry_subscription_frames_and_reset():
     finally:
         reader.destroy_node()
         rclpy.shutdown()
+
+
+def observation_at(stamp):
+    from types import SimpleNamespace
+    return SimpleNamespace(stamp_ns=stamp, color_stamp_ns=stamp, depth_stamp_ns=stamp)
+
+
+def test_phase_offset_stream_keeps_progress_without_relaxing_pose_tolerance():
+    from wheeltec_rgbd.core import Settings
+    w, settings = PoseWindow(), Settings()
+    last, matched = 0, []
+    # At each 10 Hz read, the newest image is 70 ms ahead of the last pose.
+    # The previous read's image gets a pose in the following cycle.
+    for i in range(20):
+        stamp = 1_000_000_000+i*100_000_000
+        now, mono = stamp+80_000_000, i*.1+.08
+        w.add(stamp, np.eye(4), now, mono)
+        newest = observation_at(stamp+70_000_000)
+        try:
+            obs, pose_stamp, _ = w.match_observation(newest, mono, 0, last, now, mono, settings)
+        except NoFreshFrame as exc:
+            assert str(exc) == 'NO_TIME_MATCHED_POSE'
+        else:
+            assert obs.stamp_ns > last
+            assert abs(obs.depth_stamp_ns-pose_stamp) <= 50_000_000
+            assert now-obs.stamp_ns <= 200_000_000
+            last = obs.stamp_ns
+            matched.append(i)
+    assert matched == list(range(1,20,2))
+    assert w.tolerance == .05 and w.timeout == .5
+
+
+@pytest.mark.parametrize('invalidator', ['source_age','receipt_age','epoch','reset','consumed'])
+def test_pending_image_cannot_survive_expiry_invalidation_reset_or_replay(invalidator):
+    from wheeltec_rgbd.core import Settings
+    w, settings = PoseWindow(), Settings()
+    old = observation_at(1_070_000_000)
+    w.add(1_000_000_000,np.eye(4),1_080_000_000,.08)
+    with pytest.raises(NoFreshFrame):
+        w.match_observation(old,.08,0,0,1_080_000_000,.08,settings)
+    assert w.pending is not None
+    epoch,last,mono,now=0,0,.18,1_180_000_000
+    if invalidator=='source_age':now=1_600_000_000
+    if invalidator=='receipt_age':mono=.7
+    if invalidator=='epoch':epoch=1
+    if invalidator=='reset':w.reset()
+    if invalidator=='consumed':last=old.stamp_ns
+    # Fresh pose that matches the old pending image; newest image has no pose.
+    # Inject directly to isolate pending freshness from PoseWindow.add checks.
+    w.samples.clear();w.samples.append((1_100_000_000,np.eye(4),mono))
+    if invalidator=='source_age':w.samples.append((1_500_000_000,np.eye(4),mono))
+    newest=observation_at(now-10_000_000)
+    with pytest.raises(NoFreshFrame,match='NO_TIME_MATCHED_POSE'):
+        w.match_observation(newest,mono,epoch,last,now,mono,settings)
+    assert w.pending[0] is newest
+
+
+def test_newest_match_wins_over_pending_and_localization_fault_discards_pending():
+    from wheeltec_rgbd.core import Settings
+    w,settings=PoseWindow(),Settings()
+    w.add(1_000_000_000,np.eye(4),1_080_000_000,.08)
+    with pytest.raises(NoFreshFrame):
+        w.match_observation(observation_at(1_070_000_000),.08,0,0,1_080_000_000,.08,settings)
+    w.add(1_100_000_000,np.eye(4),1_120_000_000,.12)
+    newest=observation_at(1_120_000_000)
+    obs,_,_=w.match_observation(newest,.12,0,0,1_120_000_000,.12,settings)
+    assert obs is newest and w.pending is None
+    with pytest.raises(NoFreshFrame):
+        w.match_observation(observation_at(1_170_000_000),.18,0,0,1_180_000_000,.18,settings)
+    with pytest.raises(NoFreshFrame):w.fail('POSE_DISCONTINUITY')
+    assert w.pending is None
+    with pytest.raises(NoFreshFrame,match='POSE_DISCONTINUITY'):
+        w.match_observation(observation_at(1_200_000_000),.2,0,0,1_200_000_000,.2,settings)
+
+
+def test_unmatchable_image_in_pose_gap_is_replaced_without_waiting_for_expiry():
+    from wheeltec_rgbd.core import Settings
+    w,settings=PoseWindow(),Settings()
+    w.add(1_000_000_000,np.eye(4),1_080_000_000,.08)
+    with pytest.raises(NoFreshFrame):
+        w.match_observation(observation_at(1_070_000_000),.08,0,0,1_080_000_000,.08,settings)
+    # The pending image lies 70/60 ms from both sides of a 130 ms pose gap.
+    # It is fresh but can never match within the unchanged 50 ms tolerance.
+    w.add(1_130_000_000,np.eye(4),1_210_000_000,.21)
+    replacement=observation_at(1_200_000_000)
+    with pytest.raises(NoFreshFrame):
+        w.match_observation(replacement,.21,0,0,1_210_000_000,.21,settings)
+    assert w.pending[0] is replacement
+    w.add(1_230_000_000,np.eye(4),1_310_000_000,.31)
+    obs,stamp,_=w.match_observation(observation_at(1_300_000_000),.31,0,0,
+                                   1_310_000_000,.31,settings)
+    assert obs is replacement and stamp==1_230_000_000
+    assert w.pending is None

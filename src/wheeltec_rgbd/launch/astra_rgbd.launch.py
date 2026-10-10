@@ -1,4 +1,5 @@
 from pathlib import Path
+from wheeltec_rgbd.transport import camera_transport_environment
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
@@ -10,11 +11,13 @@ from launch_ros.parameter_descriptions import ParameterValue
 
 def generate_launch_description():
     config = str(Path(get_package_share_directory('wheeltec_rgbd')) / 'config/astra_s.yaml')
+    transport_env = camera_transport_environment(Path(config).with_name('fastdds_camera.xml'))
     calibration_dir = Path.home() / '.ros/camera_info'
     color_file, depth_file = calibration_dir / 'rgb_camera.yaml', calibration_dir / 'ir_camera.yaml'
     # Only the vendor's device driver; no vendor robot, mapping or navigation launch.
     driver = Node(package='astra_camera', executable='astra_camera_node',
                   name='astra_driver', namespace='/wheeltec_camera/raw', output='screen',
+                  additional_env=transport_env,
                   condition=IfCondition(LaunchConfiguration('start_driver')),
                   parameters=[{
                       'camera_name': 'wheeltec_camera',
@@ -42,6 +45,7 @@ def generate_launch_description():
         DeclareLaunchArgument('adapter_config', default_value=config),
         driver,
         Node(package='wheeltec_rgbd', executable='rgbd_adapter', name='rgbd_adapter',
+             additional_env=transport_env,
              parameters=[LaunchConfiguration('adapter_config'), {
                  'calibration_source': ParameterValue(LaunchConfiguration('calibration_source'), value_type=str),
                  'color_calibration_url': ParameterValue(LaunchConfiguration('color_info_url'), value_type=str),

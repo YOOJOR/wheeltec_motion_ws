@@ -49,15 +49,67 @@ class PoseWindow:
         self.position_jump, self.angle_jump = position_jump, angle_jump
         self.samples = deque(maxlen=16)
         self.reason = None
+        self.pending = None
 
     def fail(self, reason):
         self.samples.clear()
+        self.pending = None
         self.reason = reason
         raise NoFreshFrame(reason)
 
     def reset(self):
         self.samples.clear()
+        self.pending = None
         self.reason = None
+
+    def match_observation(self, observation, received_at, cache_epoch,
+                          after_stamp_ns, now_ns, monotonic, settings):
+        """Prefer newest match; retain at most one fresh image awaiting a pose.
+
+        Replacing an unmatched image on every read can starve a 10 Hz consumer
+        whose newest camera frame is always ahead of the last received pose.
+        No extrapolation, relaxed tolerance, or refreshed source time is used.
+        """
+        def valid(sample):
+            obs, received, epoch = sample
+            age = (now_ns-min(obs.color_stamp_ns, obs.depth_stamp_ns))/1e9
+            return (epoch == cache_epoch and obs.stamp_ns > after_stamp_ns
+                    and monotonic-received <= settings.frame_timeout
+                    and -settings.future_tolerance <= age <= settings.frame_timeout)
+
+        current = (observation, received_at, cache_epoch)
+        if self.pending is not None and not valid(self.pending):
+            self.pending = None
+        try:
+            stamp, matrix = self.match(observation.depth_stamp_ns, now_ns, monotonic)
+        except NoFreshFrame as latest_error:
+            if str(latest_error) not in ('NO_TIME_MATCHED_POSE', 'WAITING_FOR_POSE'):
+                self.pending = None
+                raise
+            if self.pending is not None:
+                obs = self.pending[0]
+                try:
+                    stamp, matrix = self.match(obs.depth_stamp_ns, now_ns, monotonic)
+                except NoFreshFrame as pending_error:
+                    if str(pending_error) not in ('NO_TIME_MATCHED_POSE', 'WAITING_FOR_POSE'):
+                        self.pending = None
+                        raise
+                    # Once the newest pose has passed this image's matching
+                    # interval, no future pose can fill a gap in the history.
+                    # Do not hold an impossible match until the image expires.
+                    if (self.samples and self.samples[-1][0] >
+                            obs.depth_stamp_ns+self.tolerance*1e9):
+                        self.pending = None
+                else:
+                    self.pending = None
+                    return obs, stamp, matrix
+            can_wait = (not self.samples or self.samples[-1][0] <=
+                        observation.depth_stamp_ns+self.tolerance*1e9)
+            if self.pending is None and valid(current) and can_wait:
+                self.pending = current
+            raise latest_error
+        self.pending = None
+        return observation, stamp, matrix
 
     def add(self, stamp, matrix, now_ns, monotonic):
         if self.reason:
@@ -146,9 +198,14 @@ class PosedRGBDReader(RGBDReader):
 
     def read_latest(self, after_stamp_ns=0):
         with self.pose_lock:
-            obs = super().read_latest(after_stamp_ns)
-            stamp, world_body = self.poses.match(obs.depth_stamp_ns,
-                self.get_clock().now().nanoseconds, time.monotonic())
+            try:
+                obs, received, epoch = self._read_latest_sample(after_stamp_ns)
+            except NoFreshFrame:
+                self.poses.pending = None
+                raise
+            obs, stamp, world_body = self.poses.match_observation(
+                obs, received, epoch, after_stamp_ns,
+                self.get_clock().now().nanoseconds, time.monotonic(), self.settings)
             world_base = rigid(world_body @ self.body_from_base)
             return PosedObservation(obs, stamp, world_base,
                                     rigid(world_base @ self.base_from_camera))

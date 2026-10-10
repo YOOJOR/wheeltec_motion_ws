@@ -12,7 +12,7 @@ from sensor_msgs.msg import Image, CameraInfo
 from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus, KeyValue
 from wheeltec_rgbd_interfaces.msg import RGBDFrame
 from .calibration import load_camera_info, overlay_calibration
-from .core import Settings, PairBuffer, FrameError, normalize, rectify, stamp_ns
+from .core import Settings, PairBuffer, FrameError, normalize, rectify, stamp_ns, prepare_rectification
 
 
 def latest_qos(depth=1):
@@ -22,6 +22,9 @@ def latest_qos(depth=1):
 
 class RGBDNode(Node):
     def __init__(self, **kwargs):
+        # Lazy OpenCV initialization can exceed the frame deadline on Orin.
+        # Complete it before subscriptions admit the first source image.
+        prepare_rectification()
         super().__init__('rgbd_adapter', **kwargs)
         defaults = {
             'color_topic': '/wheeltec_camera/raw/color/image_raw',

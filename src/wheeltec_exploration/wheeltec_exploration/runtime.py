@@ -65,8 +65,14 @@ class PreviewNode(RGBDReader):
 
     def read_posed(self, last_stamp):
         with self.pose_lock:
-            obs = self.read_latest(after_stamp_ns=last_stamp)
-            stamp, wb = self.poses.match(obs.depth_stamp_ns,self.get_clock().now().nanoseconds,time.monotonic())
+            try:
+                obs, received, epoch = self._read_latest_sample(last_stamp)
+            except NoFreshFrame:
+                self.poses.pending = None
+                raise
+            obs, stamp, wb = self.poses.match_observation(
+                obs, received, epoch, last_stamp,
+                self.get_clock().now().nanoseconds, time.monotonic(), self.settings)
             base = rigid(wb @ self.config['body_from_base'])
             return PosedObservation(obs,stamp,base,rigid(base @ self.config['base_from_camera']))
 

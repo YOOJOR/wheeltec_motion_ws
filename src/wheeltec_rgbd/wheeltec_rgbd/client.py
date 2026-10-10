@@ -53,6 +53,7 @@ class RGBDReader(Node):
         self.latest = None
         self.received_at = None
         self.last_stamp = 0
+        self.cache_epoch = 0
         self.reason = 'WAITING'
         self.last_status = None
         self.sub_rgbd = self.create_subscription(RGBDFrame, topic, self.receive, latest_qos())
@@ -79,6 +80,7 @@ class RGBDReader(Node):
         except (FrameError, ValueError, TypeError, BufferError, OverflowError) as exc:
             with self.lock:
                 self.latest = None
+                self.cache_epoch += 1
                 self.reason = str(exc)
 
     def status(self, msg):
@@ -91,9 +93,14 @@ class RGBDReader(Node):
                 # Ignore a delayed error emitted before this observation.
                 if self.latest is None or stamp_ns(msg) >= self.latest.stamp_ns:
                     self.latest = None
+                    self.cache_epoch += 1
                     self.reason = 'ADAPTER_NOT_READY'
 
     def read_latest(self, after_stamp_ns=0):
+        return self._read_latest_sample(after_stamp_ns)[0]
+
+    def _read_latest_sample(self, after_stamp_ns=0):
+        """Atomic observation/receipt/epoch for bounded pose matching."""
         with self.lock:
             obs = self.latest
             if obs is None:
@@ -104,7 +111,8 @@ class RGBDReader(Node):
                     or source_age > self.settings.frame_timeout
                     or source_age < -self.settings.future_tolerance):
                 self.latest = None
+                self.cache_epoch += 1
                 raise NoFreshFrame('STALE')
             if obs.stamp_ns <= after_stamp_ns:
                 raise NoFreshFrame('NO_NEW_OBSERVATION')
-            return obs
+            return obs, self.received_at, self.cache_epoch

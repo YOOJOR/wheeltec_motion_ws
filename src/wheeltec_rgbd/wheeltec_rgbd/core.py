@@ -155,10 +155,16 @@ def normalize(pair, settings, now_ns):
     return rgb, metres, float(valid.mean()), delta
 
 
+def prepare_rectification():
+    """Load the image backend before accepting time-limited input frames."""
+    import cv2
+    return cv2
+
+
 def rectify(rgb, metres, color_info, depth_info):
     """Rectify registered images using supplied calibration; no invented focal length."""
     import copy
-    import cv2
+    cv2 = prepare_rectification()
     ck = np.asarray(color_info.k).reshape(3,3)
     cd, dd = np.asarray(color_info.d), np.asarray(depth_info.d)
     cp, dp = np.asarray(color_info.p).reshape(3,4), np.asarray(depth_info.p).reshape(3,4)

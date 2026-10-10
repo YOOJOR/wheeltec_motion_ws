@@ -1,6 +1,6 @@
 # 自研 ASTRA S RGB-D 接口
 
-D455 已新增独立启动和配置，继续使用同一 RGBDFrame/Reader 接口，见 [D455_INTERFACE](D455_INTERFACE.md)。奥比入口保持原样且为 baseline 默认；D455 使用独立话题和帧，上层通过 camera 选项选择。
+D455 已新增独立启动和配置，继续使用同一 RGBDFrame/Reader 接口，见 [D455_INTERFACE](D455_INTERFACE.md)。奥比仍为 baseline 默认；D455 使用独立话题和帧，上层通过 camera 选项选择。
 
 首版 2026-10-01。复用本机已安装的 Astra/OpenNI 底层驱动及现有标定文件，使用自研 wheeltec_rgbd 做配对、校验、深度单位/范围转换及最新观测读取。只启动相机，不启动厂家整车、EKF、跟随、SLAM、Nav2，不发布 /cmd_vel。厂家的完整功能包只作参考。
 
@@ -19,6 +19,10 @@ bash scripts/start_astra_rgbd.sh --start
 本机实际检查发现：SDK 的两种标定查询格式、取流前后均返回 NaN 内参；未加载文件时深度 CameraInfo 含 NaN，彩色则回退到视场角估算。接口拒绝该数据，不使用估算内参冒充设备标定。源码确认 getDepthCameraInfo 会在 SDK 参数无效时覆盖深度 K，因此仅给驱动传标定 URL 仍不能修复；适配层独立加载指定文件并保留真实输入 frame/时间戳与尺寸检查，raw 话题不改写。
 
 启动入口和自研适配层默认显式加载本机已有 ~/.ros/camera_info/rgb_camera.yaml 和 ir_camera.yaml（文件存在时）；其数值有效、尺寸均为 640×480，但两者 K/D/R/P 相同且没有设备序列号，不能证明属于当前 ASTRA S。calibration_source 标为 local_yaml_device_binding_unverified，不把成功读流写成标定精度验收。以 color_info_url、depth_info_url、calibration_source 参数可显式指定其他来源；文件缺失或无效时拒绝观测。厂家 config/camera_info.yaml 名称为 test_camera，未采用。
+
+2026-10-10 大图像传输修复：Astra launch 在使用 Fast DDS、且调用方没有指定 `FASTRTPS_DEFAULT_PROFILES_FILE` / `FASTDDS_DEFAULT_PROFILES_FILE` 时，自动为相机驱动和适配器两个子进程加载 `config/fastdds_camera.xml`。共享内存段为 **32 MiB**，同时保留 UDPv4 供发现与跨机通信；不修改全局 shell、其他节点或厂家源码。640×480 的原子 RGB-D 像素数据约 2.15 MB，默认约 512 KiB 段不足以稳定容纳大消息。[Fast DDS 官方说明](https://fast-dds.docs.eprosima.com/en/2.6.x/fastdds/transport/shared_memory/shared_memory.html)也说明段尺寸接近或小于消息时存在丢失风险。实际对比见 VALIDATION；已有显式 DDS 配置或其他 RMW 保持原设置，需自行保证大图像传输容量。直接单独运行 rgbd_adapter 时，不会自动套用 launch 的环境配置。
+
+图像后端在适配节点建立订阅前完成初始化，避免首次 OpenCV 加载耗时使首组图像超过有效期；实际图像处理超时仍按原门槛拒绝。
 
 请求模式：RGB＋深度 640×480@30，IR/点云/GUI 关闭，深度注册到彩色，设备 RGB/深度同步请求开启，仅发布相机内部 TF。驱动请求成功、帧率和同框内参检查不等于物理对齐误差或硬件同步精度已验收。
 
@@ -102,6 +106,6 @@ T_world_camera = posed.world_from_camera
 
 变换为 `T_world_camera = T_world_body × T_body_base × T_base_optical`，保留三维姿态和高度；不能直接把相机位置用作底盘位置。接口不发布 TF，也不发送速度。地图若采用其他轴向，必须再显式适配，不直接宣称已符合上游二维地图坐标。
 
-位姿缓存最多 16 条，按**深度帧**时间选最近位姿，默认差值 ≤0.05 s，不做外推；等待合适位姿时可重试同一尚未消费的 RGB-D，成功后再推进 last_stamp。位姿源和单调接收超时均为 0.5 s、允许超前 0.1 s；相邻位移 >0.5 m、三维转角 >0.8 rad、时间倒退/重复或间隔超时均锁存异常并清空位姿。三维转角检查比原控制器仅检查 yaw 更严格，不改变运动节点门槛。源帧校验不代表物理曝光同步已验收。
+位姿缓存最多 16 条，按**深度帧**时间选最近位姿，默认差值 ≤0.05 s，不做外推。优先配对最新图像；最新图像暂时超前于位姿时，最多保留一组尚未消费的图像，等待后续位姿，从而避免每轮用更新图像替换等待对象导致持续配对失败；若位姿时间已越过该图像的配对区间且仍无匹配，就丢弃这一不可配对等待帧并改用后续新图像，不等到它过期。保留帧使用原始源时间与接收单调时间，过期、相机输入失效、定位故障或显式重置后清除；成功后再推进 last_stamp，不构建待执行图像队列。位姿源和单调接收超时均为 0.5 s、允许超前 0.1 s；相邻位移 >0.5 m、三维转角 >0.8 rad、时间倒退/重复或间隔超时均锁存异常并清空位姿。三维转角检查比原控制器仅检查 yaw 更严格，不改变运动节点门槛。源帧校验不代表物理曝光同步已验收。
 
 锁存后上层必须停止导航、清除旧地图/任务、确认新定位原点，再显式 `reset_localization()`；该方法清除位姿和 RGB-D 当前缓存，不自动发布 stop，后续必须收到新数据。ROS 时间整体重置时应重建 reader 与上层任务。纯数值检测不能识别所有静止原点重置，受管 FAST-LIO 重启事件也必须由上层触发地图/任务重置。相机标定来源仍保留在 observation.calibration_source，外参确认不能替代内参设备归属及物理配准验收。
