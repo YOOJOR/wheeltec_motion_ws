@@ -8,15 +8,17 @@ body_from_base_translation: [-0.10718, -0.02237, -0.20388]
 body_from_base_rpy: [0.0, 0.0, 0.0]
 cameras:
   astra_s:
-    # PROVISIONAL: factory base_footprint->camera_link plus optical-axis rotation.
-    # Assumes wheeltec_base==factory base_footprint and zero link->color offset.
-    # These assumptions are NOT physically verified. Shadow preview only.
+    # Ground-origin wheeltec_base retained. User-selected Z on 2026-10-10:
+    # 0.0897 + 0.026 = 0.1157 m, assuming factory camera Z is from base_link.
+    # Factory transform parent/composition and alignment with wheeltec_base
+    # remain unverified; retain factory XY, optical axes and zero color offset.
+    # Shadow preview only; this is not a verified calibration.
     base_from_camera:
       - [0.0, 0.0, 1.0, 0.16083]
       - [-1.0, 0.0, 0.0, 0.00075]
-      - [0.0, -1.0, 0.0, 0.0897]
+      - [0.0, -1.0, 0.0, 0.1157]
       - [0.0, 0.0, 0.0, 1.0]
-    source: factory_senior_mec_bs_plus_optical_axis_assumptions
+    source: factory_xy_optical_axes_user_selected_ground_z_20261010_unverified
     confirmed: false
   d455:
     base_from_camera: null
