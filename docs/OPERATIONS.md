@@ -2,6 +2,8 @@
 
 当前上下文见 STAGE_SUMMARY。所有命令在小车 Ubuntu 22.04 / Humble 上运行；开发机没有原生 ROS。`motion_control.yaml` 是第一台车已启用输出的配置，新车先使用禁用的 example。
 
+地图/探索 RViz 已有预设入口：`bash scripts/start_debug_rviz.sh`。自动配置俯视地图、前沿/短期目标、IMU 位姿/轨迹和奥比原始 RGB/深度；只打开可视化，不启动设备或运动。四终端启动顺序、颜色与坐标含义、故障排查见 [VISUALIZATION](VISUALIZATION.md)。
+
 ## 当前 Co-NavGPT2 探索入口
 
 当前默认 ASTRA S，采用随机可达前沿，不接 VLM。新增程序为只读预览，不启动设备、不发布速度：

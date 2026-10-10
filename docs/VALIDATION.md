@@ -1,5 +1,16 @@
 # 当前验证摘要
 
+## 2026-10-10：RViz 地图探索调试入口
+
+新增 `scripts/start_debug_rviz.sh` 和 `config/rviz/exploration_debug.rviz`，只打开可视化，不启动硬件、规划或运动。验证内容：
+
+- `bash -n scripts/start_debug_rviz.sh`、默认/Astra 与 D455 的 `--check`、`--help` 均通过；检查模式不启动图形或 ROS 节点。
+- 在独立 ROS 域 188、ROS_LOCALHOST_ONLY=1、Xvfb 虚拟显示下实际运行入口约 22 s，发布合成 120×120 地图、目标/短期目标、Odometry、Path 和 VGA RGB/16UC1 深度。七路启用显示均有一个订阅者，实际截图可见地图、彩色目标与轨迹及两个图像窗口。
+- 图像发布使用 Best Effort，地图为 Reliable + Volatile，验证布局能够接收对应 QoS；未启动串口、相机、雷达、FAST-LIO 或运动控制。`/cmd_vel` 和导航速度输入的发布者均为 0，结束关闭验证 RViz、合成源和 Xvfb。
+- 虚拟显示/Mesa 首次创建地图时有一次 GLSL sampler 日志，截图中地图仍正常呈现；合成源未发布 TF，Global Status 有固定帧警告。此验证证明实际加载、订阅和渲染，不代表实车地图正确、Orin 桌面 GPU 无警告或相机外参验收。实际桌面表现由用户运行入口检查。
+
+证据：`runtime_logs/visualization/validation/` 中的 `report.json`、`layout.png`、`rviz.log` 和合成验证脚本。D455 仅验证参数/布局生成逻辑，未打开 D455 设备；本次没有实车运动。配置/脚本直接从仓库读取，无需重建 ROS 包；其余算法/控制未改，不重复整仓回归。
+
 ## 2026-10-10：相机更新与配对等待修复完成，静止整链连续性复验通过
 
 问题分为两段：厂家驱动的小 CameraInfo 稳定约 29 Hz，而大图像与原子 RGB-D 明显缺失；默认 Fast DDS 共享内存段约 512 KiB，当前一组 RGB-D 像素约 2.15 MB。仅将相机发布进程段容量改为 32 MiB 后大图像接收恢复。随后仍出现新图像不断替换配对等待对象、以及等待图像落在不可配对位姿间隙内的停滞，已分别修正。没有提高图像超时、同步容差或定位门槛。

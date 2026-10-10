@@ -104,7 +104,7 @@ source ~/workspace/wheeltec_motion_ws/install/local_setup.bash
 ros2 topic echo /wheeltec_exploration/decision
 ```
 
-也可在 RViz 中将 Fixed Frame 设为 `camera_init`，添加 Map `/wheeltec_exploration/map`，添加 Pose `/wheeltec_exploration/goal` 和 `/wheeltec_exploration/short_term_goal`。这些目标消息是预览，故障后 RViz 可能保留旧 Pose；是否有效以 `/decision` 的最新 reason、epoch 和时间为准。地图每秒发布一次，决策约 10 Hz；不提供完整 TF 树。
+RViz 已有预设入口：`bash scripts/start_debug_rviz.sh`。自动配置 `camera_init` 俯视地图、前沿/短期目标、IMU 位姿/轨迹和 RGB/深度，详细操作见 [VISUALIZATION](VISUALIZATION.md)。这些目标消息是预览，故障后 RViz 可能保留旧 Pose；是否有效以 `/decision` 的最新 reason、epoch 和时间为准。目标箭头不表示规划航向；地图每秒发布一次，决策约 10 Hz，不提供完整 TF 树。
 
 退出用 Ctrl+C 或等待 duration 结束。退出会写 `reason: EXITED`，此前最后一条结果保存在 `last_decision`；这不表示进程仍在运行。实时文件在 `runtime_logs/exploration/latest/`，不要把退出后留下的地图当成新观测。一次只运行一个预览实例；相机和定位仍由它们各自的终端管理。
 

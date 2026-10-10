@@ -1,0 +1,176 @@
+# Repository layout, read directly by scripts/start_debug_rviz.sh; no build needed.
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+    Property Tree Widget:
+      Expanded:
+        - /Global Options1
+        - /Exploration map1
+      Splitter Ratio: 0.5
+  - Class: rviz_common/Views
+    Name: Views
+Visualization Manager:
+  Class: ""
+  Enabled: true
+  Global Options:
+    Background Color: 45; 45; 48
+    Fixed Frame: camera_init
+    Frame Rate: 10
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Metric grid (0.5 m)
+      Enabled: true
+      Cell Size: 0.5
+      Plane Cell Count: 24
+      Reference Frame: <Fixed Frame>
+      Color: 95; 95; 100
+      Alpha: 0.3
+      Plane: XY
+    - Class: rviz_default_plugins/Map
+      Name: Exploration map
+      Enabled: true
+      Alpha: 0.85
+      Color Scheme: map
+      Draw Behind: true
+      Use Timestamp: false
+      Topic:
+        Value: /wheeltec_exploration/map
+        Depth: 1
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Durability Policy: Volatile
+    - Class: rviz_default_plugins/Pose
+      Name: Frontier goal (position only)
+      Enabled: true
+      Shape: Arrow
+      Alpha: 1
+      Shaft Length: 0.30
+      Shaft Radius: 0.035
+      Head Length: 0.12
+      Head Radius: 0.08
+      Color: 50; 255; 80
+      Topic:
+        Value: /wheeltec_exploration/goal
+        Depth: 1
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Durability Policy: Volatile
+    - Class: rviz_default_plugins/Pose
+      Name: FMM short-term goal (position only)
+      Enabled: true
+      Shape: Arrow
+      Color: 255; 160; 30
+      Alpha: 1
+      Shaft Length: 0.15
+      Shaft Radius: 0.025
+      Head Length: 0.08
+      Head Radius: 0.06
+      Topic:
+        Value: /wheeltec_exploration/short_term_goal
+        Depth: 1
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Durability Policy: Volatile
+    - Class: rviz_default_plugins/Odometry
+      Name: FAST-LIO IMU pose (not ground base)
+      Enabled: true
+      Keep: 1
+      Position Tolerance: 0
+      Angle Tolerance: 0
+      Covariance:
+        Value: false
+      Shape:
+        Value: Arrow
+        Color: 40; 170; 255
+        Alpha: 1
+        Shaft Length: 0.25
+        Shaft Radius: 0.025
+        Head Length: 0.10
+        Head Radius: 0.06
+      Topic:
+        Value: /Odometry
+        Depth: 5
+        History Policy: Keep Last
+        Reliability Policy: Best Effort
+        Durability Policy: Volatile
+        Filter size: 5
+    - Class: rviz_default_plugins/Path
+      Name: FAST-LIO IMU path
+      Enabled: true
+      Buffer Length: 1
+      Color: 40; 170; 255
+      Alpha: 0.8
+      Line Style: Lines
+      Line Width: 0.025
+      Pose Style: None
+      Topic:
+        Value: /path
+        Depth: 1
+        History Policy: Keep Last
+        Reliability Policy: Best Effort
+        Durability Policy: Volatile
+        Filter size: 5
+    - Class: rviz_default_plugins/PointCloud2
+      Name: Lidar registered cloud (optional)
+      Enabled: false
+      Decay Time: 0
+      Style: Points
+      Size (Pixels): 2
+      Size (m): 0.01
+      Position Transformer: XYZ
+      Color Transformer: FlatColor
+      Color: 130; 200; 255
+      Alpha: 0.5
+      Topic:
+        Value: /cloud_registered
+        Depth: 1
+        History Policy: Keep Last
+        Reliability Policy: Best Effort
+        Durability Policy: Volatile
+        Filter size: 5
+    - Class: rviz_default_plugins/Image
+      Name: Camera RGB (raw)
+      Enabled: true
+      Normalize Range: true
+      Transport Hint: raw
+      Topic:
+        Value: /wheeltec_camera/raw/color/image_raw
+        Depth: 1
+        History Policy: Keep Last
+        Reliability Policy: Best Effort
+        Durability Policy: Volatile
+    - Class: rviz_default_plugins/Image
+      Name: Camera depth (raw)
+      Enabled: true
+      Normalize Range: false
+      Min Value: 400
+      Max Value: 2000
+      Median window: 5
+      Transport Hint: raw
+      Topic:
+        Value: /wheeltec_camera/raw/depth/image_raw
+        Depth: 1
+        History Policy: Keep Last
+        Reliability Policy: Best Effort
+        Durability Policy: Volatile
+  Tools:
+    - Class: rviz_default_plugins/Interact
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+    - Class: rviz_default_plugins/FocusCamera
+    - Class: rviz_default_plugins/Measure
+  Views:
+    Current:
+      Class: rviz_default_plugins/TopDownOrtho
+      Name: Current View
+      Target Frame: <Fixed Frame>
+      Angle: 0
+      Scale: 85
+      X: 0
+      Y: 0
+    Saved: ~
+Window Geometry:
+  Width: 1440
+  Height: 900
+  X: 0
+  Y: 0
