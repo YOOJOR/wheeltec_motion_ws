@@ -1,3 +1,7 @@
+> 当前主探索入口：`bash scripts/start_conav_exploration.sh`，直接运行原版 Co-NavGPT2 Agent，目标识别/VLM暂时关闭。默认只读；使用、可视化和有限移动验收见 [SOURCE_AGENT](docs/SOURCE_AGENT.md)。此前 `wheeltec_exploration` 是测试对照。
+
+2026-10-12 已完成奥比相机 + FAST-LIO + 原版Agent + 持续速度接口的有限实车运动验收：一圈扫描后进入FMM转向/前进，达到预算后停车，用户确认停稳无异常。完整房间探索、避障及语义任务仍待验收；最新结论见阶段总结。
+
 # WHEELTEC 闭环运动控制 · v0.3.0
 
 ROS 2 Humble 下的相对直行和原地转向接口：FAST-LIO 位姿 → 底盘参考点换算 → `/cmd_vel` → 原厂串口通信。适用于当前 `senior_mec_bs` 麦克纳姆底盘，不修改 STM32 固件。2026-09-28 已将 FAST-LIO 迁入 vendor_ws，当前 main 使用新布局，v0.3.0 标签保留迁移前布局。
@@ -20,7 +24,8 @@ ROS 2 Humble 下的相对直行和原地转向接口：FAST-LIO 位姿 → 底�
 | [docs/EXPLORATION_POLICY.md](docs/EXPLORATION_POLICY.md) | 论文地图/前沿、启动扫描、随机目标兜底及与原版的对应 |
 | [docs/CAMERA_INTERFACE.md](docs/CAMERA_INTERFACE.md) | 相机单独启动、RGB-D 契约和新鲜观测读取 |
 | [docs/NAVIGATION.md](docs/NAVIGATION.md) | 持续速度导航契约、Co-NavGPT2 适配与失效停止 |
-| [docs/EXPLORATION_PREVIEW.md](docs/EXPLORATION_PREVIEW.md) | 当前探索系统、只读运行、验证含义与用户现场验收步骤 |
+| [docs/SOURCE_AGENT.md](docs/SOURCE_AGENT.md) | 当前原版Agent的运行、可视化、停止与有限实车验收教程 |
+| [docs/EXPLORATION_PREVIEW.md](docs/EXPLORATION_PREVIEW.md) | 旧自研测试预览的使用与验证边界 |
 | [docs/WORKSPACE_SETUP.md](docs/WORKSPACE_SETUP.md) | 第二台车从源码到编译的复刻步骤；部署为 `~/workspace/README.md` |
 | [docs/CALIBRATION.md](docs/CALIBRATION.md) | 离线旋转录包标定工具 |
 | [docs/VALIDATION.md](docs/VALIDATION.md) | 当前版本验证摘要 |

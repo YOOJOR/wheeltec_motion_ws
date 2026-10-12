@@ -1,3 +1,5 @@
+> 2026-10-12：原版Agent源码适配已成为主探索路径，按 [SOURCE_AGENT](SOURCE_AGENT.md) 分别启动基础栈、奥比接口、原版Agent及RViz。相对Action教程仍适用；旧探索预览作为测试入口保留。主探索默认不输出速度，运动需显式 --motion 和有限预算。
+
 # 使用与调试
 
 当前上下文见 STAGE_SUMMARY。所有命令在小车 Ubuntu 22.04 / Humble 上运行；开发机没有原生 ROS。`motion_control.yaml` 是第一台车已启用输出的配置，新车先使用禁用的 example。

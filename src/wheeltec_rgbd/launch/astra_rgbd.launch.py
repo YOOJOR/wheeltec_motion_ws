@@ -43,12 +43,14 @@ def generate_launch_description():
         DeclareLaunchArgument('depth_info_url', default_value=depth_file.as_uri() if depth_file.is_file() else ''),
         DeclareLaunchArgument('calibration_source', default_value='local_yaml_device_binding_unverified' if color_file.is_file() or depth_file.is_file() else 'driver_camera_info'),
         DeclareLaunchArgument('adapter_config', default_value=config),
+        DeclareLaunchArgument('max_publish_rate_hz', default_value='0.0'),
         driver,
         Node(package='wheeltec_rgbd', executable='rgbd_adapter', name='rgbd_adapter',
              additional_env=transport_env,
              parameters=[LaunchConfiguration('adapter_config'), {
                  'calibration_source': ParameterValue(LaunchConfiguration('calibration_source'), value_type=str),
                  'color_calibration_url': ParameterValue(LaunchConfiguration('color_info_url'), value_type=str),
-                 'depth_calibration_url': ParameterValue(LaunchConfiguration('depth_info_url'), value_type=str)
+                 'depth_calibration_url': ParameterValue(LaunchConfiguration('depth_info_url'), value_type=str),
+                 'max_publish_rate_hz':ParameterValue(LaunchConfiguration('max_publish_rate_hz'),value_type=float)
              }], output='screen'),
     ])

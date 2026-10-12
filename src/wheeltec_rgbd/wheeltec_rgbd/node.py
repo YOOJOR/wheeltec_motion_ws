@@ -35,12 +35,18 @@ class RGBDNode(Node):
             'calibration_source': 'driver_camera_info',
             'hardware_id': 'astra_s', 'timestamp_origin': 'driver_host_callback',
             'color_calibration_url': '', 'depth_calibration_url': '',
+            'max_publish_rate_hz': 0.0,
         }
         defaults.update(vars(Settings()))
         for key, value in defaults.items():
             self.declare_parameter(key, value)
         cfg = {key: self.get_parameter(key).value for key in vars(Settings())}
         self.settings = Settings(**cfg)
+        rate=self.get_parameter('max_publish_rate_hz').value
+        if not np.isfinite(rate) or rate<0 or (rate and rate<=1/self.settings.frame_timeout):
+            raise ValueError('publish rate must be zero (unlimited) or exceed 1/frame_timeout')
+        self.publish_interval=1/rate if rate else 0.
+        self.next_publish_at=0.;self.rate_skipped=0
         self.buffer = PairBuffer(self.settings)
         self.color_template = load_camera_info(self.get_parameter('color_calibration_url').value)
         self.depth_template = load_camera_info(self.get_parameter('depth_calibration_url').value)
@@ -70,6 +76,11 @@ class RGBDNode(Node):
             pair = self.buffer.add(kind, msg, self.get_clock().now().nanoseconds)
             if pair is None:
                 return
+            monotonic=time.monotonic()
+            if monotonic<self.next_publish_at:
+                self.rate_skipped+=1
+                return  # Drop this pair; no queue, reused decision or refreshed stamp.
+            self.next_publish_at=monotonic+self.publish_interval
             now_ns = self.get_clock().now().nanoseconds
             processing_start = time.monotonic()
             pair = overlay_calibration(pair, self.color_template, self.depth_template)
@@ -139,6 +150,8 @@ class RGBDNode(Node):
             'depth_calibration_url': self.get_parameter('depth_calibration_url').value,
             'input_counts': self.input_counts,
             'processing_max_sec': self.processing_max_sec,
+            'rate_skipped':self.rate_skipped,
+            'max_publish_rate_hz':self.get_parameter('max_publish_rate_hz').value,
         }.items()]
         msg.status = [status]
         self.status_pub.publish(msg)

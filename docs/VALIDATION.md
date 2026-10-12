@@ -1,5 +1,36 @@
 # 当前验证摘要
 
+## 2026-10-12：原版Agent适配与有限实车探索
+
+本轮主开发改为 `conavgpt2_ws/development/Co-NavGPT2` 的源码分支，旧自研预览是测试对照。执行原版 ROS_Agent.mapping、前沿、FMM和动作方法，检测/VLM关闭；坐标、观测配对、测量一圈扫描及本车速度接口单独适配。用户在车边明确授权本轮低速、有限预算试车，并确认结束实际停稳。
+
+| 验证输入 / 操作 | 实际结果 | 所证明的行为与局限 |
+| --- | --- | --- |
+| 原版源码AST对照、单位/投影/左右方向、不同裁边采样、圆盘膨胀逐格对照、短FMM路径展开 | 10项算法测试通过；原版地图/规划方法的边界改动有对照证据 | 原版方法实际复用、优化及坐标边界符合约定；采样密度降低不保证地图逐格等同全分辨率 |
+| 独立ROS域190，合成RGB-D/位姿，实际控制节点仅输出/source_test/synthetic_output | 最终8项通过：扫描→PLANNED→非零→停止，断流→零、恢复不重放，0.12s图像延迟仍处理新决定，0.35s旧图像只停止，预算正常退出/地图归档，启用拒绝或服务缺失不stop别人的Action | 验证真实ROS输入/模式/输出与时序契约；未创建实车/cmd_vel发布者、不接厂家串口。不是实测物理停车 |
+| 相机可选限频，合成原子帧与跨进程ROS传输，独立域191 | 59项相机测试通过，含限频丢弃多余帧、不改源时间、断流STALE、不重发旧帧；wheeltec_rgbd构建成功 | 限频发生在相机适配出口，不改厂家驱动/内参；默认0不限频，不降低失效门槛 |
+| 真实传感器、只读、无RViz的25s预检 | 316组有效决定，无过期；最大图像源年龄约0.169s、计算约0.063s | 当前现场/负载下输入和处理有实时余量；不保证任意负载或长期稳定 |
+| 最终真实运动：奥比、FAST-LIO、6m地图/步长4、0.05m/s前进与0.25rad/s转向，45s/0.2m/8rad预算 | 完成6.296rad启动扫描，386个INITIAL_SCAN后170个PLANNED，556条新鲜导航请求，约39.3s有效决定；预算结束stop成功 | 短程原版建图→选目标/FMM→运动输出链路通过；预算由定位估计，不能当作精确物理边界 |
+| 被动订阅真实输出、定位和状态，操作者现场确认 | /cmd_vel唯一发布者wheeltec_motion_controller；输出峰值0.05/0.25；最终IDLE且输出零。定位前后位移约0.215m，用户确认一圈后转向/前进、最终停稳无异常 | 软件停止已验证，物理停稳有定性人工确认；未尺测位移或停车时间，累计路径受定位噪声影响不作物理里程 |
+
+最终实车请求最大年龄0.0823s、图像年龄0.2119s、计算0.0679s、位姿年龄0.1215s；控制状态未出现导航超时。被动订阅收到548个决定，源程序逐帧记录556个有效决定，以各自记录范围为准，不以订阅漏帧推算源码调用数。
+
+最初两次实车尝试均因导航请求源时间过期而退出并停车，没有通过。原因是将图像采集时间直接作为运动请求时间，传输/配对/计算消耗了请求期限。当前在**开始计算一组新观测**时取decision_stamp_ns，原图像时间保留source_stamp_ns；图像年龄、计算耗时各0.3s、控制器请求0.3s、定位0.5s、配对50ms及原限速没有放宽。不在计算完成时盖新戳、不重复发旧决定。先前大分辨率超时记录同样保留。
+
+最终物理运行按预算停止，但当时入口把正常预算结束记为RuntimeError；收尾代码已改为正常结束，并补充最终状态/地图归档与控制权清理，最后8项ROS测试在这些改动后全通过。没有为日志整理再重复实车运动。本轮算法10项来自delivery-tests.log，其中5项ROS曾失败；最终ROS结果以final-ros-tests.log的8项通过为准，不将中间整体失败日志称作全套通过。数量仅帮助核对覆盖内容。当前目标更新节奏调整后没有重跑数值房间，不沿用早期模拟报告作当前版本结论。
+
+复验命令（合成输入；源码目录内，先加载Humble、motion install与conavgpt2 scripts/env.sh；线程数均1，相机FastDDS配置同运行教程）：
+
+```bash
+ROS_DOMAIN_ID=190 ROS_LOCALHOST_ONLY=1 python -m pytest wheeltec/test_agent.py wheeltec/test_runtime.py -q
+ROS_DOMAIN_ID=191 ROS_LOCALHOST_ONLY=1 python -m pytest /home/wheeltec/workspace/wheeltec_motion_ws/src/wheeltec_rgbd/test -q
+bash /home/wheeltec/workspace/wheeltec_motion_ws/scripts/start_debug_rviz.sh --check --minimal
+```
+
+算法/ROS证据在 `~/workspace/conavgpt2_ws/runtime_logs/source-agent/{delivery-tests.log,final-ros-tests.log}`；相机/静止/三次运动证据在本仓库 `runtime_logs/conav/acceptance/20261012/`，最终为 `source-motion-final.log`、`motion-final/report.json`、`motion-final/decisions.jsonl`、`motion-final-recording.json`及samples文件。原始日志不入Git。现场教程见 SOURCE_AGENT，源码差异见开发分支 WHEELTEC_ADAPTATION。
+
+收尾已停止并关闭本轮基础栈、相机、探索、记录及RViz。奥比地面高度0.1157m、完整外参confirmed=false；D455未参与。下一步是现场更长探索、地图/低障碍投影、边界与避障、真实物理停车测试，随后才接检测/VLM；不宣称完整Co-NavGPT2任务或多车系统完成。以下条目为旧测试预览及历史阶段结果。
+
 ## 2026-10-12：论文式前沿策略与启动扫描验证完成
 
 本轮按用户确认的论文流程补齐点投影已观测层、最大轮廓减膨胀障碍的前沿、随机前沿选择、无前沿全图随机候选和按位姿累计启动旋转。2026-10-10 开始时先调用 stop 并关闭本轮所有实车程序；2026-10-12 收尾期间保持关闭，没有读真实相机或发实车运动。

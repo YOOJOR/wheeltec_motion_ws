@@ -1,3 +1,5 @@
+> 当前RViz默认后端为原版Agent `/wheeltec_conav`；旧测试预览使用 `--backend test_preview`。默认地图/前沿/FMM目标由源码Agent发布，原版运行步骤见 [SOURCE_AGENT](SOURCE_AGENT.md)。仅启动RViz不会启动相机、Agent或移动。
+
 # RViz 地图与探索调试入口
 
 在 Orin 图形桌面的普通终端运行：

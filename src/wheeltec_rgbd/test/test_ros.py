@@ -14,7 +14,7 @@ from test_core import make_pair
 
 
 class Harness:
-    def __init__(self):
+    def __init__(self,rate=0.):
         rclpy.init()
         self.adapter = RGBDNode(parameter_overrides=[
             Parameter('color_topic', value='/rgbd_test/color'),
@@ -23,6 +23,7 @@ class Harness:
             Parameter('depth_info_topic', value='/rgbd_test/depth_info'),
             Parameter('output_topic', value='/rgbd_test/output'),
             Parameter('status_topic', value='/rgbd_test/status'),
+            Parameter('max_publish_rate_hz',value=rate),
         ])
         self.reader = RGBDReader(topic='/rgbd_test/output', status_topic='/rgbd_test/status')
         self.source = Node('rgbd_test_source')
@@ -77,6 +78,21 @@ def test_atomic_fresh_output_legacy_units_and_no_new_frame(h):
     h.wait(lambda:h.reader.latest is not None and h.reader.latest.stamp_ns > obs.stamp_ns)
     assert h.reader.read_latest(obs.stamp_ns).sequence == 2
     assert not h.source.get_publishers_info_by_topic('/cmd_vel')
+
+
+def test_optional_rate_limit_drops_pairs_without_republishing_or_restamping():
+    h=Harness(rate=5.)
+    try:
+        pair=h.send();h.wait(lambda:h.reader.latest is not None)
+        original=h.reader.read_latest();h.send()
+        h.wait(lambda:h.adapter.rate_skipped>0)
+        assert h.adapter.accepted==1 and h.reader.latest.stamp_ns==original.stamp_ns
+        assert original.stamp_ns==max(p.header.stamp.sec*10**9+p.header.stamp.nanosec for p in pair[:2])
+        time.sleep(.22);h.send();h.wait(lambda:h.adapter.accepted==2)
+        h.wait(lambda:h.reader.latest.stamp_ns>original.stamp_ns)
+        h.wait(lambda:'STALE' in h.statuses)
+        assert h.adapter.accepted==2
+    finally:h.close()
 
 
 def test_expiry_no_republication_and_fresh_recovery(h):
