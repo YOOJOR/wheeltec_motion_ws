@@ -39,8 +39,8 @@ def virtual_observation(x=0.,y=0.,yaw=0.,stamp=1):
     return PosedObservation(obs,stamp,base,camera)
 
 
-def simulate(fmm_class, steps=200, seed=1):
-    engine=Explorer(Config(pixel_stride=2,seed=seed),fmm_class)
+def simulate(fmm_class, steps=200, seed=1, scan_angle=2*np.pi):
+    engine=Explorer(Config(pixel_stride=2,seed=seed,initial_scan_angle=scan_angle),fmm_class)
     x=y=yaw=0.
     trajectory=[]
     actions=Counter()
@@ -72,7 +72,7 @@ def simulate(fmm_class, steps=200, seed=1):
         'processing_mean_sec':float(np.mean(timings)), 'processing_max_sec':max(timings),
         'map_cells':int(engine.grid.free.sum()) if engine.grid else 0,
         'obstacle_cells':int(engine.grid.obstacle.sum()) if engine.grid else 0,
-        'real_camera_or_pose_used':False}
+        'real_camera_or_pose_used':False,**engine.state()}
     return report,engine,np.asarray(trajectory)
 
 
@@ -80,7 +80,7 @@ def main(args=None):
     parser=argparse.ArgumentParser(description='Offline virtual room, no ROS nodes or hardware')
     parser.add_argument('--upstream-root',type=Path,required=True)
     parser.add_argument('--output',type=Path,required=True)
-    parser.add_argument('--steps',type=int,default=200)
+    parser.add_argument('--steps',type=int,default=400)
     parser.add_argument('--seed',type=int,default=1)
     opts=parser.parse_args(args)
     if not 1<=opts.steps<=2000: parser.error('steps must be 1..2000')

@@ -70,7 +70,8 @@ if [[ -z "${DISPLAY:-}" && -z "${WAYLAND_DISPLAY:-}" && -z "${QT_QPA_PLATFORM:-}
 fi
 export ROS_LOG_DIR="$rviz_root/runtime_logs/visualization/ros"
 mkdir -p "$ROS_LOG_DIR"
-echo 'White=free, black=obstacle, gray=unknown; green=goal, orange=short-term goal.'
+echo 'Paper map: white=observed non-obstacle, black=obstacle, gray=unknown (may participate in planning).'
+echo 'Cyan=frontier edges, yellow=candidates, green=goal, orange=short-term goal; text shows scan progress.'
 echo 'Odometry shows the FAST-LIO IMU/body reference point, not wheeltec_base.'
 echo 'Goal arrows are position markers, not commanded headings; check /wheeltec_exploration/decision for validity.'
 exec ros2 run rviz2 rviz2 -d "$rviz_config"

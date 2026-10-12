@@ -1,5 +1,6 @@
 """Isolated ROS domain, synthetic RGB-D/Odometry only. No device/base processes."""
 from array import array
+from dataclasses import replace
 from pathlib import Path
 import copy
 import json
@@ -12,6 +13,8 @@ from rclpy.node import Node
 from rclpy.parameter import Parameter
 from rclpy.executors import SingleThreadedExecutor
 from nav_msgs.msg import Odometry
+from nav_msgs.msg import OccupancyGrid
+from visualization_msgs.msg import MarkerArray, Marker
 from sensor_msgs.msg import CameraInfo
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
@@ -37,6 +40,7 @@ class Harness:
         rclpy.init(args=args)
         path=Path(__file__).parents[1]/'config/astra_preview.yaml'
         self.cfg=load_configuration(path)
+        self.cfg['map_config']=replace(self.cfg['map_config'],initial_scan_angle=0.)
         self.cfg['odom_topic']='/exploration_test/odom'
         self.cfg['prefix']='/exploration_test/preview'
         self.cfg['body_from_base']=np.eye(4)
@@ -47,7 +51,11 @@ class Harness:
         self.rgb_pub=self.source.create_publisher(RGBDFrame,'/exploration_test/rgbd',latest_qos())
         self.odom_pub=self.source.create_publisher(Odometry,self.cfg['odom_topic'],latest_qos())
         self.reports=[]
+        self.markers=[]
+        self.layers=[]
         self.sub=self.source.create_subscription(String,self.cfg['prefix']+'/decision',lambda m:self.reports.append(json.loads(m.data)),1)
+        self.debug_sub=self.source.create_subscription(MarkerArray,self.cfg['prefix']+'/debug_markers',self.markers.append,1)
+        self.layer_sub=self.source.create_subscription(OccupancyGrid,self.cfg['prefix']+'/explored_map',self.layers.append,1)
         self.reset=self.source.create_client(Trigger,self.cfg['prefix']+'/reset')
         self.executor=SingleThreadedExecutor()
         self.executor.add_node(self.source)
@@ -56,6 +64,7 @@ class Harness:
         self.timer=self.source.create_timer(.05,self.send)
         self.publish=True
         self.jump=False
+        self.yaw=0.
 
     def send(self):
         if not self.publish:return
@@ -65,7 +74,8 @@ class Harness:
         pose.header.stamp=stamp
         pose.header.frame_id='camera_init'
         pose.child_frame_id='body'
-        pose.pose.pose.orientation.w=1.
+        pose.pose.pose.orientation.w=float(np.cos(self.yaw/2))
+        pose.pose.pose.orientation.z=float(np.sin(self.yaw/2))
         if self.jump: pose.pose.pose.position.x=3.
         self.odom_pub.publish(pose)
         msg=RGBDFrame()
@@ -100,13 +110,13 @@ class Harness:
             time.sleep(.01)
         raise AssertionError('condition timed out')
 
-    def start(self,output,duration=3.):
+    def start(self,output,duration=3.,wait_reason='PLANNED'):
         self.engine=Explorer(self.cfg['map_config'],load_fmm(self.cfg['upstream_root']))
         self.result={}
         def worker(): self.result.update(run(self.node,self.engine,duration,output))
         self.worker=threading.Thread(target=worker)
         self.worker.start()
-        self.wait(lambda:any(v['reason']=='PLANNED' for v in self.reports))
+        self.wait(lambda:any(v['reason']==wait_reason for v in self.reports))
 
     def close(self):
         if hasattr(self,'worker'):self.worker.join(timeout=8.)
@@ -126,6 +136,9 @@ def h():
 
 def test_shadow_stream_and_stale_stop_clear_map_no_motion_interfaces(h,tmp_path):
     h.start(tmp_path,2.2)
+    h.wait(lambda:bool(h.markers) and any(m.info.width==240 for m in h.layers))
+    assert h.layers[-1].info.width==240
+    assert all(m.markers[0].action==Marker.DELETEALL for m in h.markers)
     pubs=h.source.get_publisher_names_and_types_by_node(h.node.get_name(),h.node.get_namespace())
     assert not any(name in ('/cmd_vel','/wheeltec_motion/navigation/cmd_vel') for name,_ in pubs)
     assert not h.source.get_publishers_info_by_topic('/cmd_vel')
@@ -139,6 +152,24 @@ def test_shadow_stream_and_stale_stop_clear_map_no_motion_interfaces(h,tmp_path)
     assert not h.worker.is_alive()
     assert not (tmp_path/'map.npz').exists()
     assert json.loads((tmp_path/'report.json').read_text())['reason']=='EXITED'
+
+
+def test_scan_to_planning_and_debug_markers_with_synthetic_pose_only(h,tmp_path):
+    h.cfg['map_config']=replace(h.cfg['map_config'],initial_scan_angle=.3)
+    h.start(tmp_path,3.,wait_reason='INITIAL_SCAN')
+    first=next(r for r in h.reports if r['reason']=='INITIAL_SCAN')
+    assert first['linear_x']==0 and first['angular_z']==.25
+    assert first['phase']=='INITIAL_SCAN' and not first['initial_scan_skipped']
+    for yaw in (.12,.24,.36):
+        h.yaw=yaw
+        time.sleep(.2)
+    h.wait(lambda:any(r['reason']=='PLANNED' and r['phase']=='EXPLORING' for r in h.reports))
+    h.wait(lambda:any(any(m.type==Marker.TEXT_VIEW_FACING for m in a.markers) for a in h.markers))
+    assert all(r['shadow'] and not r['motion_output'] for r in h.reports)
+    assert not h.source.get_publishers_info_by_topic('/cmd_vel')
+    h.publish=False
+    h.wait(lambda:h.engine.halted is not None)
+    h.wait(lambda:bool(h.markers) and len(h.markers[-1].markers)==1)
 
 
 def test_pose_jump_latches_until_explicit_reset(h,tmp_path):

@@ -11,6 +11,10 @@ from wheeltec_exploration.offline import simulate, virtual_observation
 UPSTREAM = Path('/home/wheeltec/workspace/conavgpt2_ws/upstream/Co-NavGPT2')
 
 
+def legacy_config(**values):
+    return Config(exploration_policy='known_free', initial_scan_angle=0., **values)
+
+
 @pytest.fixture(scope='module')
 def fmm(): return load_fmm(UPSTREAM)
 
@@ -19,13 +23,13 @@ def fmm(): return load_fmm(UPSTREAM)
     {'size_m':1000},{'pixel_stride':0},{'seed':-1},{'clearance':float('nan')},
     {'obstacle_min_height':2.},{'goal_tolerance':1.}])
 def test_invalid_or_unsafe_config(values):
-    with pytest.raises(ValueError): Config(**values)
+    with pytest.raises(ValueError): legacy_config(**values)
 
 
 def test_projection_and_grid_axis_conventions():
     p=unproject(np.array([[1.,np.nan],[2.,0.]]),np.array([[1.,0,0],[0,1.,0],[0,0,1.]]),1)
     np.testing.assert_allclose(p,[[0,0,1],[0,2,2]])
-    grid=Grid(Config(),[0,0])
+    grid=Grid(legacy_config(),[0,0])
     r,c=grid.cell([1.,2.])
     assert r>c
     assert np.linalg.norm(grid.xy((r,c))-[1.,2.]) < .05
@@ -39,7 +43,7 @@ def test_ray_order_preserved_both_directions():
 
 
 def test_occluding_obstacle_blocks_free_carving():
-    grid=Grid(Config(pixel_stride=1),[0,0])
+    grid=Grid(legacy_config(pixel_stride=1),[0,0])
     grid.update(np.array([[.8,0,.5],[1.2,0,0]]),[.15,0,.5],[0,0,0])
     assert grid.obstacle[grid.cell([.8,0])]
     assert not grid.free[grid.cell([1.2,0])]
@@ -47,13 +51,13 @@ def test_occluding_obstacle_blocks_free_carving():
 
 
 def test_ceiling_is_not_proof_of_traversable_floor():
-    grid=Grid(Config(),[0,0])
+    grid=Grid(legacy_config(),[0,0])
     grid.update(np.array([[1.,0,3.]]),[.15,0,.5],[0,0,0])
     assert not grid.free[grid.cell([1.,0])]
 
 
 def test_unknown_and_disconnected_cells_excluded():
-    grid=Grid(Config(),[0,0])
+    grid=Grid(legacy_config(),[0,0])
     base=grid.cell([0,0])
     grid.free[base[0]-10:base[0]+10,base[1]-10:base[1]+10]=True
     grid.free[2:8,2:8]=True
@@ -64,7 +68,7 @@ def test_unknown_and_disconnected_cells_excluded():
 
 
 def test_obstacle_inflation_blocks_base():
-    grid=Grid(Config(),[0,0])
+    grid=Grid(legacy_config(),[0,0])
     grid.free[:]=True
     grid.obstacle[grid.cell([.2,0])]=True
     assert not grid.reachable(grid.cell([0,0])).any()
@@ -80,8 +84,8 @@ def test_provisional_preview_height_is_explicitly_unconfirmed_and_d455_refused()
 
 
 def test_official_fmm_pipeline_is_deterministic_and_bounded(fmm):
-    a,engine,trajectory=simulate(fmm,30,1)
-    b,_,trajectory2=simulate(fmm,30,1)
+    a,engine,trajectory=simulate(fmm,30,1,scan_angle=0.)
+    b,_,trajectory2=simulate(fmm,30,1,scan_angle=0.)
     assert a['reasons'].get('PLANNED',0)>0
     assert a['actions']==b['actions']
     np.testing.assert_allclose(trajectory,trajectory2)
@@ -90,7 +94,7 @@ def test_official_fmm_pipeline_is_deterministic_and_bounded(fmm):
 
 
 def test_old_observation_not_processed_and_fault_requires_reset(fmm):
-    engine=Explorer(Config(),fmm)
+    engine=Explorer(legacy_config(),fmm)
     posed=virtual_observation(stamp=1)
     engine.update(posed,0.)
     version=engine.grid.version
@@ -104,14 +108,14 @@ def test_old_observation_not_processed_and_fault_requires_reset(fmm):
 
 
 def test_map_boundary_halts_without_wrapping(fmm):
-    engine=Explorer(Config(),fmm)
+    engine=Explorer(legacy_config(),fmm)
     engine.update(virtual_observation(stamp=1),0.)
     result=engine.update(virtual_observation(x=20,stamp=2),.1)
     assert result.reason=='MAP_BOUNDARY' and engine.grid is None
 
 
 def test_no_unknown_random_fallback_and_goal_stability(fmm):
-    engine=Explorer(Config(),fmm)
+    engine=Explorer(legacy_config(),fmm)
     engine.grid=Grid(engine.cfg,[0,0])
     base=np.eye(4)
     assert engine.plan(base,0.).action=='stop'
@@ -127,7 +131,7 @@ def test_no_unknown_random_fallback_and_goal_stability(fmm):
 
 
 def test_turn_direction_and_speed_limits(fmm):
-    engine=Explorer(Config(),fmm)
+    engine=Explorer(legacy_config(),fmm)
     engine.grid=Grid(engine.cfg,[0,0])
     engine.grid.free[95:145,95:170]=True
     # Same fixed target, opposite headings should command opposite turns.
@@ -145,7 +149,7 @@ def test_turn_direction_and_speed_limits(fmm):
 
 
 def test_semantic_target_approach_uses_known_reachable_floor_and_reset(fmm):
-    engine=Explorer(Config(),fmm)
+    engine=Explorer(legacy_config(),fmm)
     engine.grid=Grid(engine.cfg,[0,0])
     engine.grid.free[100:141,100:181]=True
     engine.target_xy=np.array([2.,0.])
@@ -170,12 +174,12 @@ def test_target_mask_uses_metres_and_correct_world_transform():
 
 
 def test_locked_fmm_grid_units_cannot_be_changed_silently():
-    with pytest.raises(ValueError): Config(resolution=.1)
-    with pytest.raises(ValueError): Config(goal_tolerance=.1)
+    with pytest.raises(ValueError): legacy_config(resolution=.1)
+    with pytest.raises(ValueError): legacy_config(goal_tolerance=.1)
 
 
 def test_semantic_approach_does_not_switch_on_jitter_and_no_progress_is_reported(fmm):
-    engine=Explorer(Config(),fmm)
+    engine=Explorer(legacy_config(),fmm)
     base=np.eye(4)
     engine.grid=Grid(engine.cfg,[0,0])
     engine.grid.free[100:141,100:181]=True

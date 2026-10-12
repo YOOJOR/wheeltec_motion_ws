@@ -1,6 +1,7 @@
-"""Bounded ROS-world XY mapping and random reachable frontiers; no device or control I/O."""
+"""Bounded mapping, initial observation turn and paper-style frontiers; no device I/O."""
 from dataclasses import dataclass, asdict
 import math
+import cv2
 import numpy as np
 from scipy import ndimage
 from wheeltec_rgbd.posed import rigid
@@ -8,6 +9,11 @@ from wheeltec_rgbd.posed import rigid
 
 @dataclass(frozen=True)
 class Config:
+    exploration_policy: str = 'paper_frontier'
+    initial_scan_angle: float = 2*math.pi
+    initial_scan_timeout: float = 45.
+    paper_frontier_min_cells: int = 20
+    fallback_sample_attempts: int = 64
     resolution: float = .05
     size_m: float = 12.
     pixel_stride: int = 8
@@ -33,6 +39,11 @@ class Config:
                     'goal_no_progress_sec','goal_blacklist_sec','turn_threshold',
                     'forward_speed','turn_speed','target_approach_distance')
         if (not all(math.isfinite(getattr(self,k)) and getattr(self,k)>0 for k in positive)
+                or self.exploration_policy not in ('paper_frontier','known_free')
+                or not math.isfinite(self.initial_scan_angle) or not 0 <= self.initial_scan_angle <= 2*math.pi
+                or not math.isfinite(self.initial_scan_timeout) or self.initial_scan_timeout <= 0
+                or type(self.paper_frontier_min_cells) is not int or self.paper_frontier_min_cells < 1
+                or type(self.fallback_sample_attempts) is not int or not 1 <= self.fallback_sample_attempts <= 1000
                 or not math.isfinite(self.clearance) or self.clearance < 0
                 or type(self.pixel_stride) is not int or self.pixel_stride < 1
                 or type(self.frontier_min_cells) is not int or self.frontier_min_cells < 1
@@ -72,6 +83,8 @@ class Grid:
         self.n = round(cfg.size_m/cfg.resolution)
         self.origin = np.asarray(origin_xy, float)-self.n*cfg.resolution/2
         self.free = np.zeros((self.n,self.n),bool)
+        # Point-projection layer from the paper, distinct from ray-carved free space.
+        self.explored = np.zeros_like(self.free)
         self.obstacle = np.zeros_like(self.free)
         self.version = 0
 
@@ -88,6 +101,9 @@ class Grid:
     def update(self, points, camera_xyz, base_xyz):
         start = self.cell(camera_xyz[:2])
         base = self.cell(base_xyz[:2])
+        cells = np.floor((points[:,:2]-self.origin)/self.cfg.resolution).astype(int)
+        inside = np.all((cells >= 0)&(cells < self.n),axis=1)
+        self.explored[cells[inside,1],cells[inside,0]] = True
         relative_z = points[:,2]-base_xyz[2]
         obstacles = ((relative_z >= self.cfg.obstacle_min_height)
                      & (relative_z <= self.cfg.obstacle_max_height))
@@ -118,14 +134,40 @@ class Grid:
         self.free[self.obstacle] = False
         self.version += 1
 
-    def reachable(self, base_cell):
+    def reachable(self, base_cell, *, allow_unknown=False):
         radius = math.ceil((self.cfg.footprint_radius+self.cfg.clearance)/self.cfg.resolution)
         r,c = np.mgrid[-radius:radius+1,-radius:radius+1]
         inflated = ndimage.binary_dilation(self.obstacle, structure=r*r+c*c<=radius*radius)
-        traversable = self.free & ~inflated
+        traversable = ~inflated if allow_unknown else self.free & ~inflated
         if not traversable[base_cell]: return np.zeros_like(traversable)
         labels,_ = ndimage.label(traversable)
         return labels == labels[base_cell]
+
+    def paper_frontiers(self):
+        """Global_Map_Proc.Frontier_Det geometry, adapted to ROS XY row/column.
+
+        Locked Co-NavGPT2 utils/explored_map_utils.py: 5x5 close, largest contour,
+        7x7 obstacle dilation, 8-connected groups, strict area threshold, up to 6.
+        Goal selection is performed separately, replacing the VLM with seeded RNG.
+        """
+        closed = cv2.morphologyEx(self.explored.astype(np.uint8),cv2.MORPH_CLOSE,
+                                 np.ones((5,5),np.uint8))
+        contours,_ = cv2.findContours(closed,cv2.RETR_TREE,cv2.CHAIN_APPROX_NONE)
+        edge = np.zeros_like(closed)
+        if contours:
+            cv2.drawContours(edge,[max(contours,key=cv2.contourArea)],-1,1,1)
+        edge[:2,:] = edge[-2:,:] = 0
+        edge[:,:2] = edge[:,-2:] = 0
+        obstacles = cv2.dilate(self.obstacle.astype(np.uint8),np.ones((7,7),np.uint8))
+        edge = (edge != 0)&(obstacles == 0)
+        labels,count = ndimage.label(edge,structure=np.ones((3,3)))
+        groups = []
+        for i in range(1,count+1):
+            cells = np.argwhere(labels == i)
+            if len(cells) > self.cfg.paper_frontier_min_cells:
+                groups.append((len(cells),tuple(cells.mean(axis=0).astype(int))))
+        # Match upstream's stable ascending area order before its six-group cap.
+        return [point for _,point in sorted(groups,key=lambda v:v[0])[:6]],edge
 
     def frontiers(self, reachable, base_cell):
         unknown = ~(self.free|self.obstacle)
@@ -147,7 +189,8 @@ class Grid:
 
     def occupancy(self):
         data = np.full(self.free.shape,-1,np.int8)
-        data[self.free] = 0
+        observed = self.explored if self.cfg.exploration_policy == 'paper_frontier' else self.free
+        data[observed] = 0
         data[self.obstacle] = 100
         return data
 
@@ -162,6 +205,11 @@ class Decision:
     short_term_xy: object = None
     frontier_count: int = 0
     points: int = 0
+    phase: str = 'EXPLORING'
+    scan_progress_rad: float = 0.
+    scan_target_rad: float = 0.
+    goal_source: str = 'none'
+    planning_allows_unknown: bool = False
 
     def as_dict(self): return asdict(self)
 
@@ -182,28 +230,71 @@ class Explorer:
         self.target_xy = None
         self.goal_kind = 'random_frontier'
         self.halted = None
+        self.scan_started = None
+        self.scan_last_yaw = None
+        self.scan_progress = 0.
+        self.scan_complete = self.cfg.initial_scan_angle == 0
+        self.frontier_goals = []
+        self.frontier_edge = None
 
     def halt(self, reason):
         self.grid = None
         self.goal = None
         self.blacklist.clear()
         self.target_xy = None
+        self.frontier_goals = []
+        self.frontier_edge = None
         self.halted = reason
-        return Decision(reason)
+        return Decision(reason,phase='HALTED')
+
+    def initial_scan(self, base_matrix, monotonic):
+        """Progress comes only from new paired poses, never elapsed callback count."""
+        if self.scan_complete: return None
+        if self.cfg.exploration_policy == 'paper_frontier':
+            self.frontier_goals,self.frontier_edge = self.grid.paper_frontiers()
+        yaw = math.atan2(base_matrix[1,0],base_matrix[0,0])
+        if self.scan_started is None:
+            self.scan_started,self.scan_last_yaw = monotonic,yaw
+        else:
+            delta = math.atan2(math.sin(yaw-self.scan_last_yaw),math.cos(yaw-self.scan_last_yaw))
+            self.scan_progress += delta  # Signed: turning right cannot complete a left scan.
+            self.scan_last_yaw = yaw
+        if monotonic-self.scan_started > self.cfg.initial_scan_timeout:
+            return self.halt('INITIAL_SCAN_TIMEOUT')
+        if self.scan_progress >= self.cfg.initial_scan_angle:
+            self.scan_complete = True
+            self.goal_kind = 'random_frontier'
+            return None
+        base = self.grid.cell(base_matrix[:2,3])
+        if not self.grid.reachable(base,allow_unknown=True)[base]:
+            return self.halt('INITIAL_SCAN_BLOCKED')
+        self.goal_kind = 'initial_scan'
+        return Decision('INITIAL_SCAN','left',0.,self.cfg.turn_speed,
+                        phase='INITIAL_SCAN',scan_progress_rad=self.scan_progress,
+                        scan_target_rad=self.cfg.initial_scan_angle,goal_source='initial_scan')
+
+    def state(self):
+        return {'phase':'HALTED' if self.halted else 'EXPLORING' if self.scan_complete else 'INITIAL_SCAN',
+                'scan_progress_rad':self.scan_progress,'scan_target_rad':self.cfg.initial_scan_angle,
+                'exploration_policy':self.cfg.exploration_policy,'goal_kind':self.goal_kind,
+                'goal_source':self.goal_kind,'planning_allows_unknown':self.cfg.exploration_policy=='paper_frontier'}
 
     def plan(self, base_matrix, monotonic):
         grid = self.grid
         base = grid.cell(base_matrix[:2,3])
-        reachable = grid.reachable(base)
+        paper = self.cfg.exploration_policy == 'paper_frontier'
+        reachable = grid.reachable(base,allow_unknown=paper)
         if not reachable[base]: return Decision('BASE_NOT_TRAVERSABLE')
-        goals, edge = grid.frontiers(reachable,base)
+        goals, edge = grid.paper_frontiers() if paper else grid.frontiers(reachable,base)
+        self.frontier_goals,self.frontier_edge = goals,edge
         self.blacklist = {g:t for g,t in self.blacklist.items() if monotonic < t}
         semantic_goal = None
         if self.target_xy is not None:
             distance_to_target = np.linalg.norm(self.target_xy-base_matrix[:2,3])
             if distance_to_target <= self.cfg.target_approach_distance:
                 return Decision('TARGET_REACHED',goal_xy=self.target_xy.tolist())
-            cells = np.argwhere(reachable)
+            # Optional detected-target approach retains measured free-space checks.
+            cells = np.argwhere(grid.reachable(base))
             xy = grid.origin+(cells[:,::-1]+.5)*self.cfg.resolution
             distances = np.linalg.norm(xy-self.target_xy,axis=1)
             approach = ((distances >= self.cfg.target_approach_distance-.1)
@@ -232,7 +323,8 @@ class Explorer:
             self.goal_kind = 'random_frontier'
         if self.goal is not None:
             distance = np.linalg.norm(grid.xy(self.goal)-base_matrix[:2,3])
-            valid = reachable[self.goal] and (self.goal_kind == 'semantic_target' or edge[self.goal])
+            valid = reachable[self.goal] and (self.goal_kind in ('semantic_target','random_map_fallback')
+                        or (self.goal in goals if paper else edge[self.goal]))
             if distance < self.best_distance-.03:
                 self.best_distance, self.progress_at = distance, monotonic
             expired = monotonic-self.progress_at > self.cfg.goal_no_progress_sec
@@ -245,11 +337,29 @@ class Explorer:
                     return Decision('TARGET_APPROACH_REACHED',goal_xy=arrival_xy)
                 if semantic and expired:
                     return Decision('TARGET_NO_PROGRESS',goal_xy=arrival_xy)
-        candidates = [g for g in goals if g not in self.blacklist]
+        candidates = [g for g in goals if g not in self.blacklist and reachable[g]
+                      and np.linalg.norm(grid.xy(g)-base_matrix[:2,3]) > self.cfg.goal_tolerance]
+        # Prefer a newly available frontier over continuing an unknown-map fallback.
+        if candidates and self.goal_kind == 'random_map_fallback': self.goal = None
         if self.goal is None:
-            if not candidates: return Decision('NO_REACHABLE_FRONTIER', frontier_count=len(goals))
-            self.goal_kind = 'random_frontier'
-            self.goal = candidates[int(self.rng.integers(len(candidates)))]
+            if candidates:
+                self.goal_kind = 'random_frontier'
+                self.goal = candidates[int(self.rng.integers(len(candidates)))]
+            elif paper:
+                self.goal_kind = 'random_map_fallback'
+                # Sample the whole map like upstream, with bounded rejection of
+                # occupied/disconnected/arrived goals instead of forcing them free.
+                for _ in range(self.cfg.fallback_sample_attempts):
+                    g = tuple((self.rng.random(2)*(grid.n-1)).astype(int))
+                    if (reachable[g] and g not in self.blacklist and
+                            np.linalg.norm(grid.xy(g)-base_matrix[:2,3]) > self.cfg.goal_tolerance):
+                        self.goal = g
+                        break
+                if self.goal is None:
+                    return Decision('NO_VALID_RANDOM_GOAL',frontier_count=len(goals),
+                                    goal_source=self.goal_kind,planning_allows_unknown=True)
+            else:
+                return Decision('NO_REACHABLE_FRONTIER', frontier_count=len(goals))
             self.best_distance = np.linalg.norm(grid.xy(self.goal)-base_matrix[:2,3])
             self.progress_at = monotonic
         goal_xy = grid.xy(self.goal).tolist()
@@ -263,8 +373,11 @@ class Explorer:
             self.goal = None
             return Decision('FMM_NO_VALID_STEP', goal_xy=goal_xy, frontier_count=len(goals))
         if stop:
+            if self.goal_kind != 'semantic_target':
+                self.blacklist[self.goal] = monotonic+self.cfg.goal_blacklist_sec
             self.goal = None
-            reason = 'TARGET_APPROACH_REACHED' if self.goal_kind == 'semantic_target' else 'FRONTIER_REACHED'
+            reason = ('TARGET_APPROACH_REACHED' if self.goal_kind == 'semantic_target' else
+                      'RANDOM_GOAL_REACHED' if self.goal_kind == 'random_map_fallback' else 'FRONTIER_REACHED')
             return Decision(reason, goal_xy=goal_xy, frontier_count=len(goals))
         target = grid.xy(stg)
         delta = target-base_matrix[:2,3]
@@ -274,10 +387,12 @@ class Explorer:
         if error > self.cfg.turn_threshold: action,v,w = 'left',0.,self.cfg.turn_speed
         elif error < -self.cfg.turn_threshold: action,v,w = 'right',0.,-self.cfg.turn_speed
         else: action,v,w = 'forward',self.cfg.forward_speed,0.
-        return Decision('PLANNED',action,v,w,goal_xy,target.tolist(),len(goals))
+        return Decision('PLANNED',action,v,w,goal_xy,target.tolist(),len(goals),
+                        goal_source=self.goal_kind,planning_allows_unknown=paper,
+                        scan_progress_rad=self.scan_progress,scan_target_rad=self.cfg.initial_scan_angle)
 
     def update(self, posed, monotonic, target_points=None):
-        if self.halted: return Decision(self.halted)
+        if self.halted: return Decision(self.halted,phase='HALTED')
         obs = posed.observation
         if obs.stamp_ns <= self.last_stamp: return Decision('NO_NEW_OBSERVATION')
         base, camera = rigid(posed.world_from_base), rigid(posed.world_from_camera)
@@ -293,7 +408,8 @@ class Explorer:
         world = points @ camera[:3,:3].T+camera[:3,3]
         try:
             self.grid.update(world,camera[:3,3],base[:3,3])
-            result = self.plan(base,monotonic)
+            result = self.initial_scan(base,monotonic)
+            if result is None: result = self.plan(base,monotonic)
         except ValueError as exc:
             return self.halt(str(exc))
         self.last_stamp = obs.stamp_ns

@@ -1,6 +1,8 @@
 # 单车探索预览：系统现状、使用方法与验收
 
-更新：2026-10-02。当前目标是先用 ASTRA S 推进 Co-NavGPT2 实机 baseline，前沿选择暂用随机策略，不接入 VLM。本文是当前入口，完整接口细节分别见 [相机接口](CAMERA_INTERFACE.md)、[持续速度导航](NAVIGATION.md) 和 [阶段总结](STAGE_SUMMARY.md)。
+更新：2026-10-10。当前目标是先用 ASTRA S 推进 Co-NavGPT2 实机 baseline，前沿选择暂用随机策略，不接入 VLM。本文是当前入口，完整接口细节分别见 [相机接口](CAMERA_INTERFACE.md)、[持续速度导航](NAVIGATION.md) 和 [阶段总结](STAGE_SUMMARY.md)。
+
+当前策略已更新为论文式点投影地图/轮廓前沿，新增按位姿累计的启动扫描和无前沿随机地图目标，未知可参与规划。静止调试请使用 `--skip-initial-scan`；完整原版对应、差异和状态见 [EXPLORATION_POLICY](EXPLORATION_POLICY.md)。下面现场日期段落为历史记录。
 
 **2026-10-09 现场更新：静止验收未通过，尚未进行移动。** 真实图像可读，放入纸箱后深度覆盖明显改善；但端到端观测间歇造成 STALE 锁存，图像配准/相机高度亦有待核验。当前优先处理这些实际问题，记录见 [VALIDATION](VALIDATION.md)。
 
@@ -41,9 +43,11 @@
 
 新包为 `src/wheeltec_exploration`。不运行原版 Go2/ZMQ 实车入口，不导入原版 Agent/VLM。官方来源锁定为 `891ba09959278b666ef01a7f8b6c64f8fe8436cc`，只加载未修改的 `utils/fmm_planner.py`；其余配对、世界 XY 地图、前沿管理和 ROS 预览是本车适配代码。它并非完整复刻了原版所有建图、语义评分和协作逻辑。
 
-地图以首次有效底盘世界位置为中心，默认 12 m × 12 m、5 cm 栅格，有明确边界。深度以米反投影，依据相对底盘地面参考点的高度区分地面和障碍；已观察障碍会阻止射线将其后方标为空闲。障碍按暂定车体半径和余量膨胀，FMM 只使用底盘所在的已知可达区域。未知区域不能直接作为可通行区域，没有可达前沿时输出停止建议。
+地图以首次有效底盘世界位置为中心，默认 12 m × 12 m、5 cm 栅格，有明确边界。默认 paper_frontier 将有效三维点投影到已观测层，按本车地面参考高度投影障碍；前沿从最大已观测轮廓扣除膨胀障碍后分组产生。通行图按现有车体半径及余量膨胀障碍，允许未知区域参与 FMM，地图上未知仍为灰色。
 
-随机是在“可达的已知区域边缘”中选择目标，不是随机给底盘转向。目标仍可用时保留，长期无进展会暂时排除；随机种子用于复现。地图是简化、累计的二维栅格：没有动态障碍清除、完整三维语义融合、回环后地图修正、悬崖/坑洞检测或独立雷达避障。这些限制会影响真实场景使用。
+默认先给出左转扫描建议，根据新鲜位姿累计一圈后开始选择前沿。扫描超时或阻挡锁存；只读入口不驱车，静止预览必须显式跳过扫描，否则进度不会自行完成。候选前沿使用随机选择替代 VLM；没有有效前沿时全图随机取候选，做有限次数的障碍/连通性检查。目标稳定和无进展更换沿用本车适配规则，旧 known_free 策略可通过配置用于对照。
+
+地图仍为累计二维栅格，没有动态障碍清除、完整三维语义融合、回环后修正、悬崖/坑洞检测或独立雷达避障。允许未知参与规划不证明那里实际可通行。
 
 处理循环名义为 10 Hz，订阅回调单独运行，只消费最新观测，旧观测不重复建图。没有新输入时不生成新的运动决策时间戳。源图像年龄或处理时间超过 0.3 s 时输出 `PROCESSING_EXPIRED` 和零速度建议。该数值与运动接口 0.3 s 指令有效期对应，不是物理制动时间。
 
@@ -77,7 +81,7 @@ bash scripts/start_exploration_preview.sh --demo --steps 300
 `--check` 核对默认配置、安装依赖和官方 FMM 来源。`--demo` 在数值生成的房间中模拟 RGB-D、位姿和运动，输出位于 `runtime_logs/exploration/demo/`：
 
 - `report.json`：输入来源、决策分布、处理时间及 `motion_output: false`。
-- `map.png`：白为空闲、黑为障碍、灰为未知；图像上方对应世界 +Y。
+- `map.png`：白为已观测非障碍、黑为障碍、灰为未知；图像上方对应世界 +Y。
 - `map.npz`：栅格、原点和分辨率；`simulated_trajectory.npy`：模拟轨迹。
 
 模拟的位移和地图只能证明该输入下程序运行，不能代替真实相机、车体运动或避障验收。
@@ -93,7 +97,7 @@ bash scripts/start_exploration_preview.sh --demo --steps 300
 
 ```bash
 cd ~/workspace/wheeltec_motion_ws
-bash scripts/start_exploration_preview.sh --start --duration 60
+bash scripts/start_exploration_preview.sh --start --skip-initial-scan --duration 60
 ```
 
 3. 查看诊断和地图：
@@ -104,7 +108,7 @@ source ~/workspace/wheeltec_motion_ws/install/local_setup.bash
 ros2 topic echo /wheeltec_exploration/decision
 ```
 
-RViz 已有预设入口：`bash scripts/start_debug_rviz.sh`。自动配置 `camera_init` 俯视地图、前沿/短期目标、IMU 位姿/轨迹和 RGB/深度，详细操作见 [VISUALIZATION](VISUALIZATION.md)。这些目标消息是预览，故障后 RViz 可能保留旧 Pose；是否有效以 `/decision` 的最新 reason、epoch 和时间为准。目标箭头不表示规划航向；地图每秒发布一次，决策约 10 Hz，不提供完整 TF 树。
+RViz 已有预设入口：`bash scripts/start_debug_rviz.sh`。自动配置 `camera_init` 俯视地图、前沿/短期目标、IMU 位姿/轨迹和 RGB/深度，详细操作见 [VISUALIZATION](VISUALIZATION.md)。默认显示具有 0.5 s 寿命的前沿/目标/状态标记，故障清除；旧 Pose 显示默认关闭，手动打开时仍可能保留旧箭头。是否有效以 `/decision` 的最新 reason、epoch 和时间为准。地图每秒发布一次，决策约 10 Hz，不提供完整 TF 树。
 
 退出用 Ctrl+C 或等待 duration 结束。退出会写 `reason: EXITED`，此前最后一条结果保存在 `last_decision`；这不表示进程仍在运行。实时文件在 `runtime_logs/exploration/latest/`，不要把退出后留下的地图当成新观测。一次只运行一个预览实例；相机和定位仍由它们各自的终端管理。
 
@@ -118,7 +122,7 @@ RViz 已有预设入口：`bash scripts/start_debug_rviz.sh`。自动配置 `cam
 | 世界投影 | 前方墙体在底盘前方；左右方向正确；地面接近底盘参考点 Z | 核验光学轴、相机高度/偏转、两个底盘参考点差异 |
 | 静止地图 | 墙体位置稳定，没有随静止噪声明显铺成多条墙或侵入车体 | 检查位姿新鲜度、配对时间、外参和深度质量 |
 | 空闲与障碍 | 实际墙/家具落在障碍，未知区保留灰色，墙后不被当成已知空闲 | 保持预览，定位问题后再继续 |
-| 决策 | 目标和短期目标在已知可达区域；墙/窄通道阻断时不会直穿 | 检查地图及暂定车体半径，不能靠调大速度解决 |
+| 决策 | 目标可在未知区域，但不应穿过已标记的膨胀障碍；区分随机前沿与全图兜底 | 检查地图及暂定车体半径，不能靠调大速度解决 |
 | 处理时效 | source_age_sec / processing_sec 经常低于 0.3 s，没有持续失效 | 查明取流、时间同步和处理瓶颈；不无限放宽超时 |
 
 Astra 的已知范围为 0.4–2 m，近盲区及低有效深度覆盖可能造成停止建议，不能把无深度直接解释为空地。暂定 footprint_radius=0.25 m、clearance=0.05 m 和高度阈值不是已测车体包络，需要现场测量确认。地图通过前不要把 `confirmed` 改成 true；布尔值记录验收结论，不能替代验收本身。
@@ -131,8 +135,10 @@ Astra 的已知范围为 0.4–2 m，近盲区及低有效深度覆盖可能造�
 | --- | --- |
 | `PLANNED` | 这一新观测产生有效建议；预览仍不发送速度 |
 | `WAITING` / `NO_NEW_OBSERVATION` / `NO_TIME_MATCHED_POSE` / `WAITING_FOR_POSE` | 等待新帧或可配对位姿，不重发旧决策 |
-| `NO_REACHABLE_FRONTIER` / `BASE_NOT_TRAVERSABLE` | 没有可达目标或底盘所在栅格不可通行，建议停止 |
-| `FRONTIER_REACHED` / `FMM_NO_VALID_STEP` | 当前前沿结束或无有效短期步，当前建议为停止 |
+| `INITIAL_SCAN` | 输出左转观察建议，进度依据配对位姿；预览不驱车 |
+| `INITIAL_SCAN_TIMEOUT` / `INITIAL_SCAN_BLOCKED` | 扫描未完成或有已知障碍阻挡，清图锁存，等待显式 reset |
+| `NO_VALID_RANDOM_GOAL` / `BASE_NOT_TRAVERSABLE` | 随机尝试耗尽或底盘点不可通行，建议停止；旧 known_free 模式仍可能给出 NO_REACHABLE_FRONTIER |
+| `FRONTIER_REACHED` / `RANDOM_GOAL_REACHED` / `FMM_NO_VALID_STEP` | 当前前沿结束或无有效短期步，当前建议为停止 |
 | `PROCESSING_EXPIRED` | 本次处理/源数据过期，建议为零；下一新帧可重新预览 |
 | 位姿跳变/失效、输入断流、`MAP_BOUNDARY`、`PROCESSING_ERROR` | 故障锁存，清地图和目标，不能靠数据恢复自动延续旧任务 |
 | `TARGET_REACHED` / `TARGET_APPROACH_REACHED` | 可选语义模式的几何停止条件，不能证明实车识别或任务成功 |
@@ -159,7 +165,8 @@ ros2 service call /wheeltec_exploration/reset std_srvs/srv/Trigger '{}'
 | size_m / pixel_stride | 12 m / 8；有界地图与深度采样密度 |
 | obstacle_min/max_height / floor_tolerance | 0.08–1.3 m / 0.08 m，均相对底盘地面参考点 |
 | footprint_radius / clearance | 0.25 m / 0.05 m，暂定且待测 |
-| frontier_min_cells / goal_min_distance | 3 格 / 0.45 m，过滤过小/过近候选 |
+| exploration_policy / initial_scan_angle | paper_frontier / 2π rad；启动扫描、随机兜底参数详见 EXPLORATION_POLICY |
+| frontier_min_cells / goal_min_distance | 3 格 / 0.45 m，仅用于旧 known_free 对照策略 |
 | goal_no_progress_sec / goal_blacklist_sec | 10 s / 15 s，无进展及暂时排除时间 |
 | turn_threshold / forward_speed / turn_speed | 0.35 rad / 0.10 m/s / 0.25 rad/s，预览建议；仍受本车 0.15 / 0.35 上限约束 |
 | target_approach_distance / seed | 0.6 m / 1，语义接近参考值与随机种子 |
@@ -179,7 +186,7 @@ ros2 service call /wheeltec_exploration/reset std_srvs/srv/Trigger '{}'
 | 输入/操作 | 检查的实际结果 | 能证明的范围与限制 |
 | --- | --- | --- |
 | 已知像素、米制深度和刚体变换 | 点落在预期世界方向和栅格 | 数学与单位约定；不证明真实外参准确 |
-| 已知墙体、天花板、未知区和断开的空闲区 | 墙后不清空，天花板不当作地面，未知/不可达区不供 FMM 通行 | 人为场景下的地图规则；不证明真实深度质量或安全避障 |
+| 已知墙体、天花板、未知区和断开的空闲区 | 未知不被写成已观测；paper_frontier 允许未知规划但阻断已知障碍，known_free 保持原限制 | 人为场景下的地图规则；不证明真实深度质量或安全避障 |
 | 连续合成 RGB-D/位姿 | 地图、随机目标、官方 FMM 和方向建议连续产生 | 软件数据链接通；不等于实车探索效率 |
 | 重复旧帧、断流、位姿跳变、故意延迟计算 | 不重复建图，输出零建议；严重故障清地图并锁存，reset 后需新数据 | 这些故障的程序行为；不证明所有现场故障已覆盖 |
 | 隔离域内真实 ROS 消息及控制节点 | 可查看/断言实际速度消息、服务与状态；停止后输出零，限制有效 | ROS 与控制输出契约；没有串口/轮子，不证明物理停车 |

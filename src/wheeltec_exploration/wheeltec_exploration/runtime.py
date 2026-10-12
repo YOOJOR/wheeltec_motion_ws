@@ -1,6 +1,8 @@
 """Shadow-only runtime: no Twist publisher, navigation client, device startup or VLM."""
 import argparse
 from collections import deque
+from dataclasses import replace
+import copy
 import json
 from pathlib import Path
 import signal
@@ -10,7 +12,8 @@ import numpy as np
 import rclpy
 from rclpy.executors import SingleThreadedExecutor
 from nav_msgs.msg import Odometry, OccupancyGrid
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, Point
+from visualization_msgs.msg import Marker, MarkerArray
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
 from wheeltec_rgbd.client import RGBDReader, NoFreshFrame
@@ -33,6 +36,9 @@ class PreviewNode(RGBDReader):
         prefix = config['prefix'].rstrip('/')
         self.decision_pub = self.create_publisher(String,prefix+'/decision',1)
         self.map_pub = self.create_publisher(OccupancyGrid,prefix+'/map',1)
+        self.explored_pub = self.create_publisher(OccupancyGrid,prefix+'/explored_map',1)
+        self.obstacle_pub = self.create_publisher(OccupancyGrid,prefix+'/obstacle_map',1)
+        self.debug_pub = self.create_publisher(MarkerArray,prefix+'/debug_markers',1)
         self.goal_pub = self.create_publisher(PoseStamped,prefix+'/goal',1)
         self.stg_pub = self.create_publisher(PoseStamped,prefix+'/short_term_goal',1)
         self.reset_service = self.create_service(Trigger,prefix+'/reset',self.request_reset)
@@ -80,7 +86,8 @@ class PreviewNode(RGBDReader):
         msg = String()
         msg.data = json.dumps({**decision.as_dict(), 'source_stamp_ns':stamp,
             'shadow':True,'motion_output':False,
-            'selector':'local_detected_target' if metrics.get('goal_kind')=='semantic_target' else 'random_reachable_frontier',
+            'selector':metrics.get('goal_kind',decision.goal_source),
+            'initial_scan_skipped':self.config['map_config'].initial_scan_angle == 0,
             'camera':self.config['camera'],'world_frame':'camera_init',
             'extrinsics_confirmed':self.config['extrinsics_confirmed'],
             'extrinsics_source':self.config['extrinsics_source'], **metrics},ensure_ascii=False)
@@ -107,6 +114,49 @@ class PreviewNode(RGBDReader):
             msg.info.origin.orientation.w = 1.
             msg.data = grid.occupancy().ravel().tolist()
         self.map_pub.publish(msg)
+        explored,obstacles = copy.deepcopy(msg),copy.deepcopy(msg)
+        if grid is not None:
+            explored.data = np.where(grid.explored,0,-1).astype(np.int8).ravel().tolist()
+            # Binary obstacle mask, not a free-space declaration.
+            obstacles.data = (grid.obstacle.astype(np.int8)*100).ravel().tolist()
+        self.explored_pub.publish(explored)
+        self.obstacle_pub.publish(obstacles)
+
+    def publish_debug(self, engine, report, floor_z=0.):
+        array = MarkerArray()
+        clear = Marker(); clear.action = Marker.DELETEALL
+        array.markers.append(clear)
+        def marker(kind, color, size):
+            m = Marker(); m.header.frame_id = 'camera_init'
+            m.header.stamp = self.get_clock().now().to_msg()
+            m.ns = 'exploration'; m.id = len(array.markers); m.type = kind
+            m.pose.orientation.w = 1.
+            m.scale.x = m.scale.y = m.scale.z = size
+            m.color.r,m.color.g,m.color.b,m.color.a = (*color,1.)
+            m.lifetime.nanosec = 500_000_000
+            array.markers.append(m)
+            return m
+        grid = engine.grid
+        if grid is not None:
+            for cells,color,size in ((np.argwhere(engine.frontier_edge) if engine.frontier_edge is not None else [],
+                                      (0.,.9,1.),.045),
+                                     (engine.frontier_goals,(1.,.85,0.),.12)):
+                m = marker(Marker.POINTS,color,size)
+                for cell in cells:
+                    x,y = grid.xy(cell)
+                    m.points.append(Point(x=float(x),y=float(y),z=float(floor_z+.03)))
+            if report.get('reason') == 'PLANNED':
+                for name,color in (('goal_xy',(0.,1.,.2)),('short_term_xy',(1.,.5,0.))):
+                    xy = report.get(name)
+                    if xy is not None:
+                        m = marker(Marker.SPHERE,color,.14)
+                        m.pose.position = Point(x=float(xy[0]),y=float(xy[1]),z=float(floor_z+.08))
+            m = marker(Marker.TEXT_VIEW_FACING,(1.,1.,1.),.14)
+            center = grid.origin+grid.cfg.size_m/2
+            m.pose.position = Point(x=float(center[0]),y=float(center[1]+.6),z=float(floor_z+.2))
+            m.text = (f"{report.get('reason')} | {engine.goal_kind}\n"
+                      f"scan {np.degrees(engine.scan_progress):.0f}/{np.degrees(engine.cfg.initial_scan_angle):.0f} deg (preview)")
+        self.debug_pub.publish(array)
 
 
 class Recorder:
@@ -128,6 +178,7 @@ class Recorder:
                 (self.directory/name).unlink(missing_ok=True)
             return
         np.savez_compressed(self.directory/'map.npz',occupancy=grid.occupancy(),
+                            explored=grid.explored,obstacle=grid.obstacle,free=grid.free,
                             origin_xy=grid.origin,resolution=grid.cfg.resolution)
         import cv2
         occ=grid.occupancy()
@@ -176,7 +227,7 @@ def run(node, engine, duration=0., output=None, perception=None):
                 metrics = {'processed':processed,'epoch':epoch,'source_age_sec':source_age,
                            'processing_sec':elapsed,'calibration_source':obs.calibration_source,
                            'upstream_commit':LOCKED_COMMIT,'perception_mode':perception_mode,
-                           'goal_kind':engine.goal_kind,'vlm_enabled':False,**target_metrics}
+                           'vlm_enabled':False,**engine.state(),**target_metrics}
                 report = node.emit(decision,obs.stamp_ns,metrics)
             except NoFreshFrame as exc:
                 reason = str(exc)
@@ -190,12 +241,13 @@ def run(node, engine, duration=0., output=None, perception=None):
                 else:
                     decision = Decision(reason)
                 report = node.emit(decision,last_stamp,{'processed':processed,'epoch':epoch,
-                    'perception_mode':perception_mode,'goal_kind':engine.goal_kind,'vlm_enabled':False})
+                    'perception_mode':perception_mode,'vlm_enabled':False,**engine.state()})
             except Exception as exc:
                 report = node.emit(engine.halt('PROCESSING_ERROR'),last_stamp,
                                    {'error_type':type(exc).__name__,'error':str(exc),'processed':processed,'epoch':epoch,
-                                    'perception_mode':perception_mode,'vlm_enabled':False})
+                                    'perception_mode':perception_mode,'vlm_enabled':False,**engine.state()})
                 node.publish_grid(None)
+            node.publish_debug(engine,report,floor_z)
             if loop-last_save >= 1.:
                 node.publish_grid(engine.grid,floor_z)
                 recorder.save(report,engine.grid)
@@ -203,11 +255,14 @@ def run(node, engine, duration=0., output=None, perception=None):
                 last_save = loop
             time.sleep(max(0.,.1-(time.monotonic()-loop)))
     finally:
-        final = {**Decision('EXITED').as_dict(),'source_stamp_ns':last_stamp,'processed':processed,
+        final = {**Decision('EXITED').as_dict(),**engine.state(),'phase':'EXITED',
+                 'initial_scan_skipped':engine.cfg.initial_scan_angle==0,
+                 'source_stamp_ns':last_stamp,'processed':processed,
                  'epoch':epoch,'shadow':True,'motion_output':False,'camera':node.config['camera'],
                  'perception_mode':perception_mode,'vlm_enabled':False}
         if rclpy.ok():
             node.emit(Decision('EXITED'),last_stamp,final)
+            node.debug_pub.publish(MarkerArray(markers=[Marker(action=Marker.DELETEALL)]))
         # Retain last decision separately, without claiming an exited process is active.
         final['last_decision'] = report
         recorder.save(final,engine.grid)
@@ -223,11 +278,14 @@ def main(args=None):
     parser.add_argument('--duration',type=float,default=0.)
     parser.add_argument('--output',type=Path)
     parser.add_argument('--perception',action='store_true',help='Enable local models; remains READ-ONLY')
+    parser.add_argument('--skip-initial-scan',action='store_true',help='Stationary preview only; explicitly skip scan, not a completed scan')
     parser.add_argument('--target',default='chair')
     parser.add_argument('--device',choices=['cpu','cuda'],default='cuda')
     opts=parser.parse_args(args)
     if not np.isfinite(opts.duration) or opts.duration < 0: parser.error('duration must be >=0')
     config=load_configuration(opts.config,opts.camera)
+    if opts.skip_initial_scan:
+        config['map_config'] = replace(config['map_config'],initial_scan_angle=0.)
     engine=Explorer(config['map_config'],load_fmm(config['upstream_root']))
     perception=None
     if opts.perception:

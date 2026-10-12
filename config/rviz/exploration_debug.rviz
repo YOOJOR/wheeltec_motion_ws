@@ -41,7 +41,7 @@ Visualization Manager:
         Durability Policy: Volatile
     - Class: rviz_default_plugins/Pose
       Name: Frontier goal (position only)
-      Enabled: true
+      Enabled: false
       Shape: Arrow
       Alpha: 1
       Shaft Length: 0.30
@@ -57,7 +57,7 @@ Visualization Manager:
         Durability Policy: Volatile
     - Class: rviz_default_plugins/Pose
       Name: FMM short-term goal (position only)
-      Enabled: true
+      Enabled: false
       Shape: Arrow
       Color: 255; 160; 30
       Alpha: 1
@@ -69,6 +69,38 @@ Visualization Manager:
         Value: /wheeltec_exploration/short_term_goal
         Depth: 1
         History Policy: Keep Last
+        Reliability Policy: Reliable
+        Durability Policy: Volatile
+    - Class: rviz_default_plugins/MarkerArray
+      Name: Frontiers goals and scan status
+      Enabled: true
+      Namespaces: {}
+      Topic:
+        Value: /wheeltec_exploration/debug_markers
+        Depth: 1
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Durability Policy: Volatile
+    - Class: rviz_default_plugins/Map
+      Name: Explored points layer (optional)
+      Enabled: false
+      Alpha: 1
+      Color Scheme: map
+      Draw Behind: true
+      Topic:
+        Value: /wheeltec_exploration/explored_map
+        Depth: 1
+        Reliability Policy: Reliable
+        Durability Policy: Volatile
+    - Class: rviz_default_plugins/Map
+      Name: Obstacle mask only (optional)
+      Enabled: false
+      Alpha: 0.5
+      Color Scheme: map
+      Draw Behind: true
+      Topic:
+        Value: /wheeltec_exploration/obstacle_map
+        Depth: 1
         Reliability Policy: Reliable
         Durability Policy: Volatile
     - Class: rviz_default_plugins/Odometry

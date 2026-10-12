@@ -1,5 +1,26 @@
 # 当前验证摘要
 
+## 2026-10-12：论文式前沿策略与启动扫描验证完成
+
+本轮按用户确认的论文流程补齐点投影已观测层、最大轮廓减膨胀障碍的前沿、随机前沿选择、无前沿全图随机候选和按位姿累计启动旋转。2026-10-10 开始时先调用 stop 并关闭本轮所有实车程序；2026-10-12 收尾期间保持关闭，没有读真实相机或发实车运动。
+
+| 验证输入 / 操作 | 实际结果 | 证明范围 |
+| --- | --- | --- |
+| 三组已观测/障碍栅格：矩形、障碍分隔、大小区域并存 | 本车前沿点结果与从锁定原源码抽取的 Global_Map_Proc.Frontier_Det 相同 | 当前前沿几何对齐；不证明真实点云质量 |
+| 全未知地图、已知墙体和断开区域、固定不可用随机候选 | 可在未知区选目标但地图保持未知；不强行清除障碍，有限尝试耗尽后停止建议 | 原版式未知规划/兜底及本车有效性约束 |
+| 前沿进入0.25 m到达容差、出现新的合格前沿 | 已到达前沿不再反复重选；新前沿优先于旧全图随机目标 | 消除 FRONTIER_REACHED 循环，不以删除到达容差推进 |
+| 新配对位姿跨±π、重复图像、静止/反向旋转、超时及近障碍 | 只有有符号实际转角推进扫描；超时/阻挡给零建议并清图锁存，reset后重新等待输入 | 扫描状态与异常行为；不是实测旋转精度或碰撞验收 |
+| 独立ROS域188，合成RGB-D/Odometry | 实际收到 INITIAL_SCAN→EXPLORING/PLANNED、分层OccupancyGrid、带清除/寿命的MarkerArray；断流/位姿跳变仍清图，显式reset恢复 | ROS数据契约与旧保护未回归；入口没有 /cmd_vel 发布者 |
+| 300步数值房间闭环 | INITIAL_SCAN 252次、PLANNED 48次，累计转角6.30 rad、3个目标；平均处理18.9 ms、最大42.8 ms，motion_output=false | 虚拟扫描完成后能持续规划；不是实车导航或环境覆盖证明 |
+
+最终命令及结果：`WHEELTEC_EXPLORATION_TEST_DOMAIN_ID=188 bash scripts/test_exploration.sh`，58项通过（23.22 s，数量仅用于漏跑检查）。其中包含旧known_free对照、官方FMM、相机配对输入、故障/reset和实际控制节点的隔离测试出口。只有 synthetic_output 允许测试非零速度，未连接底盘串口或实车 /cmd_vel。
+
+300步demo：`bash scripts/start_exploration_preview.sh --demo --steps 300 --output runtime_logs/exploration/paper-policy-demo`。构建wheeltec_exploration成功，脚本语法、`--check`及diff检查通过。中间测试曾把首个空地图消息误当作有效地图，已改为等待有尺寸的地图；最终近处到达处理及退出状态也已复验。
+
+证据：`runtime_logs/exploration-test/paper-policy-final.log`、`paper-demo.log`、`paper-build.log`，以及 `runtime_logs/exploration/paper-policy-demo/` 的报告、分层map.npz和模拟轨迹。旧中间日志保留；本轮不重复实车动作或相机验收。
+
+当前默认前沿策略允许未知参与FMM，与此前known_free限制不同；未知颜色仍保留，不能据此宣布路径实际无障碍。启动旋转按一圈反馈替代原版处理步数，本车半径/限速/时间门槛保留；完整对应差异见 EXPLORATION_POLICY。现场入口仍只读，实车扫描及运动桥联合验收待后续执行。
+
 ## 2026-10-10：RViz 地图探索调试入口
 
 新增 `scripts/start_debug_rviz.sh` 和 `config/rviz/exploration_debug.rviz`，只打开可视化，不启动硬件、规划或运动。验证内容：

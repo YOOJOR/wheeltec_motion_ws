@@ -6,7 +6,7 @@
 
 ## 当前 Co-NavGPT2 探索入口
 
-当前默认 ASTRA S，采用随机可达前沿，不接 VLM。新增程序为只读预览，不启动设备、不发布速度：
+当前默认 ASTRA S，采用论文式前沿、启动扫描与无前沿全图随机兜底，不接 VLM。新增程序为只读预览，不启动设备、不发布速度：
 
 ```bash
 cd ~/workspace/wheeltec_motion_ws
@@ -14,7 +14,7 @@ bash scripts/start_exploration_preview.sh --check
 bash scripts/start_exploration_preview.sh --demo --steps 300
 ```
 
-以上可在不进行实车调试时执行。真实相机/定位已由用户启动后，使用 `--start --duration 60` 查看真实数据预览；静止投影、地图检查和故障 reset 的完整步骤见 [EXPLORATION_PREVIEW](EXPLORATION_PREVIEW.md)。相机外参暂定未确认，预览没有自动导航模式启用功能。下面的运动命令属于既有控制操作，不能用来替代探索验收。
+以上可在不进行实车调试时执行。真实相机/定位已由用户启动后，静止调试使用 `--start --skip-initial-scan --duration 60` 查看真实数据预览；静止投影、地图检查和故障 reset 的完整步骤见 [EXPLORATION_PREVIEW](EXPLORATION_PREVIEW.md)。相机外参暂定未确认，预览没有自动导航模式启用功能。下面的运动命令属于既有控制操作，不能用来替代探索验收。
 
 ## 启动与停止
 

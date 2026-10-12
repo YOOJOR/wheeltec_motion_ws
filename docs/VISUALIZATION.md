@@ -28,7 +28,7 @@ bash scripts/start_astra_rgbd.sh --start
 ```bash
 # 终端三：只读地图 / 随机前沿 / FMM
 cd ~/workspace/wheeltec_motion_ws
-bash scripts/start_exploration_preview.sh --start
+bash scripts/start_exploration_preview.sh --start --skip-initial-scan
 ```
 
 ```bash
@@ -45,15 +45,17 @@ bash scripts/start_debug_rviz.sh
 
 | 显示项 | 话题及意义 |
 | --- | --- |
-| Exploration map | `/wheeltec_exploration/map`：白色空闲、黑色障碍、灰色未知；5 cm 栅格，地图约 1 Hz |
-| Frontier goal | `/wheeltec_exploration/goal`：绿色箭头标记目标位置 |
-| FMM short-term goal | `/wheeltec_exploration/short_term_goal`：橙色箭头标记短期目标位置 |
+| Exploration map | `/wheeltec_exploration/map`：白色已观测非障碍、黑色障碍、灰色未知；5 cm 栅格，地图约 1 Hz |
+| Frontiers goals and scan status | `/wheeltec_exploration/debug_markers`：青色边缘、黄色候选、绿色目标、橙色短期目标和扫描/状态文字 |
+| Explored points layer / Obstacle mask | 默认关闭，分别查看点投影层和二值障碍层；障碍掩码的白色只表示未标记障碍 |
 | FAST-LIO IMU pose | `/Odometry`：蓝色箭头为 IMU/body 位姿，不是地面 wheeltec_base，也不是相机原点 |
 | FAST-LIO IMU path | `/path`：定位轨迹，缺少该话题时不影响探索地图显示 |
 | Lidar registered cloud | `/cloud_registered`：默认关闭，可手动勾选对比雷达几何；不是 RGB-D 探索地图 |
 | Camera RGB / depth | 两个原始图像窗口；奥比深度显示范围固定为 400–2000 mm，超出显示范围不代表有效测量 |
 
-目标消息的 orientation 当前为单位四元数，箭头仅用颜色/大小区分位置，不表示规划航向。无前沿时不一定有目标消息；故障/reset 后 RViz 可能保留旧目标，旧箭头不能作为有效规划证据。地图为空或清除后也可能短暂留下显示状态，以最新决策、epoch 和源时间为准。
+默认目标改为带 0.5 s 寿命的球形标记，每轮清除旧标记，故障/reset/退出时清除。旧 Pose 话题仍发布，但布局默认关闭其箭头显示；手动开启时，箭头只表示位置且可能遗留。是否有效以最新决策、epoch 和源时间为准。
+
+上述静止教程显式跳过启动扫描。去掉 `--skip-initial-scan` 时会显示 INITIAL_SCAN 和转角进度，但只读入口不会转动车体，静止保持至 45 s 会触发扫描超时。跳过扫描会在诊断中明确标记，不代表扫描验收通过。
 
 RGB/深度显示为驱动原始图像；算法使用自研 `/wheeltec_camera/rgbd` 的去畸变、米制、有效范围过滤观测。原始图像窗口不需要车体相机 TF，因此这里只用 Image 显示，不用要求世界相机变换的 Camera/DepthCloud。入口不生成任何假定 TF；缺少 wheeltec_base 或世界相机 TF 不能通过改帧名解决。
 
@@ -69,13 +71,13 @@ source ~/workspace/wheeltec_motion_ws/install/local_setup.bash
 ros2 topic echo /wheeltec_exploration/decision
 ```
 
-`processed` 持续增加表示新观测被处理；`PLANNED` 才表示产生有效建议，仍不驱车。`NO_REACHABLE_FRONTIER` 时同时检查相机深度缺失、地图中连续空闲范围和障碍位置。不要把灰色未知当成可通行。
+`processed` 持续增加表示新观测被处理；`INITIAL_SCAN` 表示旋转观察建议，`PLANNED` 表示目标规划建议，均不驱车。`goal_source` 区分 random_frontier 和 random_map_fallback；默认策略允许灰色未知参与规划，颜色不代表已证实可通行。`NO_VALID_RANDOM_GOAL` 表示有限采样未找到可用目标。策略细节见 [EXPLORATION_POLICY](EXPLORATION_POLICY.md)。
 
 画面没有数据，先展开对应显示的 Status：
 
 - 图像空白：确认相机终端运行、topic 名称正确，查看 `/wheeltec_camera/status`。原始深度缺失时先检查有效视野，不调整规划速度。
 - 没有地图：确认探索运行、`processed` 增加，检查相机和 `/Odometry` 是否新鲜、能否时间配对。
-- 目标不更新：检查最新 reason；无可达前沿时没有新目标是正常行为。
+- 目标不更新：检查最新 reason；扫描阶段没有目标是正常行为；探索阶段无前沿会进入全图随机兜底。
 - 定位轨迹变化但地图偏移/重影：检查时间配对、外参、FAST-LIO 是否重启，不能把 IMU 点误作底盘点。
 - 整体无话题：核对 ROS_DOMAIN_ID / ROS_LOCALHOST_ONLY / RMW 设置是否与生产节点一致。
 - RViz 没有窗口：在图形桌面运行；虚拟显示启动验证不能替代实际桌面检查。

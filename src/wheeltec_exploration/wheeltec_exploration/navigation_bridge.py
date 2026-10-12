@@ -33,9 +33,12 @@ class DecisionBridge:
         if decision.reason in ('NO_NEW_OBSERVATION','NO_TIME_MATCHED_POSE','WAITING_FOR_POSE'):
             self.client.poll()  # No cached decision or fresh timestamp is manufactured.
             return False
-        if decision.reason != 'PLANNED' or decision.action not in ('forward','left','right'):
+        if decision.reason not in ('PLANNED','INITIAL_SCAN') or decision.action not in ('forward','left','right'):
             self.stop()
             return False
+        if decision.reason == 'INITIAL_SCAN' and (decision.action != 'left' or decision.linear_x != 0.):
+            self.stop()
+            raise ValueError('INVALID_SCAN_DECISION')
         if type(stamp_ns) is not int or stamp_ns <= self.last_stamp:
             self.stop()
             raise ValueError('NEW_SOURCE_TIMESTAMP_REQUIRED')

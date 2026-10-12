@@ -20,6 +20,25 @@ def test_unconfirmed_geometry_cannot_arm():
     assert not client.calls
 
 
+def test_scan_uses_fresh_turn_decisions_and_fault_disarms():
+    client=Fake()
+    bridge=DecisionBridge(client,extrinsics_confirmed=True,calibration_verified=True)
+    bridge.arm(1)
+    assert bridge.submit(Decision('INITIAL_SCAN','left',0.,.25),100,1)
+    assert client.calls[-1]==('left',100)
+    assert not bridge.submit(Decision('INITIAL_SCAN_TIMEOUT'),200,1)
+    assert client.calls[-1]=='stop' and bridge.epoch is None
+
+
+def test_scan_cannot_smuggle_forward_motion():
+    client=Fake()
+    bridge=DecisionBridge(client,extrinsics_confirmed=True,calibration_verified=True)
+    bridge.arm(1)
+    with pytest.raises(ValueError,match='INVALID_SCAN_DECISION'):
+        bridge.submit(Decision('INITIAL_SCAN','forward',.1,0.),100,1)
+    assert client.calls[-1]=='stop'
+
+
 def test_bridge_updates_new_decisions_without_replay_and_stops_on_fault():
     client=Fake()
     bridge=DecisionBridge(client,extrinsics_confirmed=True,calibration_verified=True)

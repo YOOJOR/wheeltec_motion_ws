@@ -17,6 +17,7 @@ ROS 2 Humble 下的相对直行和原地转向接口：FAST-LIO 位姿 → 底�
 | [docs/STAGE_SUMMARY.md](docs/STAGE_SUMMARY.md) | 后续工作的统一上下文入口 |
 | [docs/OPERATIONS.md](docs/OPERATIONS.md) | 日常启动、动作调用、参数调整与故障排查 |
 | [docs/VISUALIZATION.md](docs/VISUALIZATION.md) | RViz 预设启动、探索地图/图像/定位显示与调试 |
+| [docs/EXPLORATION_POLICY.md](docs/EXPLORATION_POLICY.md) | 论文地图/前沿、启动扫描、随机目标兜底及与原版的对应 |
 | [docs/CAMERA_INTERFACE.md](docs/CAMERA_INTERFACE.md) | 相机单独启动、RGB-D 契约和新鲜观测读取 |
 | [docs/NAVIGATION.md](docs/NAVIGATION.md) | 持续速度导航契约、Co-NavGPT2 适配与失效停止 |
 | [docs/EXPLORATION_PREVIEW.md](docs/EXPLORATION_PREVIEW.md) | 当前探索系统、只读运行、验证含义与用户现场验收步骤 |
