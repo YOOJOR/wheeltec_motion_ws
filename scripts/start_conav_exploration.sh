@@ -15,13 +15,8 @@ conav_deployment="${WHEELTEC_CONAV_ROOT:-/home/wheeltec/workspace/conavgpt2_ws}"
 source "$conav_deployment/scripts/env.sh"
 # Bound native CPU pools in this process tree; leave sensor/ROS processes alone.
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
-conav_dds_profile="$(python - "$conav_motion_root/src/wheeltec_rgbd/config/fastdds_camera.xml" <<'PY'
-import sys
-from wheeltec_rgbd.transport import camera_transport_environment
-print(camera_transport_environment(sys.argv[1]).get('FASTRTPS_DEFAULT_PROFILES_FILE',''))
-PY
-)"
-if [[ -n "$conav_dds_profile" ]]; then export FASTRTPS_DEFAULT_PROFILES_FILE="$conav_dds_profile"; fi
+# The large SHM segment belongs to camera publishers. Keep the consumer/control
+# participant on the caller's DDS settings (middleware defaults when unset).
 cd "$conav_deployment/development/Co-NavGPT2"
 export ROS_LOG_DIR="$conav_motion_root/runtime_logs/conav/ros"
 mkdir -p "$ROS_LOG_DIR"

@@ -67,11 +67,13 @@ class NavigationClient(Node):
         rclpy.spin_once(self, timeout_sec=0.)
 
     def call(self, client, request, timeout):
-        deadline = time.monotonic()+timeout
         if not client.wait_for_service(timeout_sec=timeout):
             raise ServiceUnavailable('motion service unavailable; no request will be replayed')
         future = client.call_async(request)
-        rclpy.spin_until_future_complete(self, future, timeout_sec=max(0., deadline-time.monotonic()))
+        # Discovery can use its entire bounded window. A newly sent request
+        # still needs a bounded response window; never send then wait zero time.
+        # This does not change velocity freshness or retry the request.
+        rclpy.spin_until_future_complete(self, future, timeout_sec=timeout)
         if not future.done():
             client.remove_pending_request(future)
             raise RuntimeError('motion service response timeout; state is uncertain, stop before retry')
@@ -177,3 +179,7 @@ def main(args=None):
         node.destroy_node()
         rclpy.shutdown()
     return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

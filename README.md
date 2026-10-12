@@ -1,5 +1,7 @@
 > 当前主探索入口：`bash scripts/start_conav_exploration.sh`，直接运行原版 Co-NavGPT2 Agent，目标识别/VLM暂时关闭。默认只读；使用、可视化和有限移动验收见 [SOURCE_AGENT](docs/SOURCE_AGENT.md)。此前 `wheeltec_exploration` 是测试对照。
 
+最新进一步测试发现运动时图像迟到会触发保护停车，持续探索尚未通过；服务等待与手动停止模块入口已修复。下一步先排查图像/配对时序，见阶段总结最新结论。
+
 2026-10-12 已完成奥比相机 + FAST-LIO + 原版Agent + 持续速度接口的有限实车运动验收：一圈扫描后进入FMM转向/前进，达到预算后停车，用户确认停稳无异常。完整房间探索、避障及语义任务仍待验收；最新结论见阶段总结。
 
 # WHEELTEC 闭环运动控制 · v0.3.0

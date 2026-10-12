@@ -2,6 +2,8 @@
 
 当前主代码在 `~/workspace/conavgpt2_ws/development/Co-NavGPT2` 的 wheeltec-adaptation 分支，直接运行源码 ROS_Agent.mapping()。目标识别暂时关闭，VLM不接入；最近前沿/无前沿随机目标、点云建图、FMM和动作选择由原版Agent执行。`src/wheeltec_exploration` 是此前测试实现，作为对照保留，不能当作原版Agent。
 
+最新验收状态（2026-10-12）：前一轮短程链路通过，但扩大到60s/0.5m/10rad后的测试出现运动时图像迟到并保护停止，持续探索尚未通过。当前应先排查输入时序，不直接扩大活动范围。人工停止模块入口和服务等待问题已修复；案例见VALIDATION最新节。
+
 ## 1. 三个分别启动的程序
 
 以下入口都不会因执行 --check 而移动。先分别打开终端：
@@ -21,6 +23,8 @@ bash scripts/start_astra_rgbd.sh --start max_publish_rate_hz:=20.0
 ```
 
 20是自研原子帧发布上限，实际可能约15Hz；不是修改相机曝光/驱动30Hz模式。默认0保留不限频。多余配对被直接丢弃，不积队列、补发旧帧或改原时间戳。既有内参/配准流程和32MiB FastDDS共享内存保留。
+
+大SHM配置仅由相机发布入口自动设置；探索入口使用调用方的DDS配置或中间件默认值。无需在全局终端导出相机专用配置。
 
 第三个终端先只读原版Agent：
 
@@ -93,6 +97,8 @@ python3 scripts/record_conav_acceptance.py --duration 60 --output runtime_logs/c
 ```
 
 记录命令上限、唯一/cmd_vel发布者、源码决策、位姿变化及最终输出。位姿累计路径/转角包含定位噪声，不等于真实里程；优先看前后变化和时序。Agent报告默认 runtime_logs/conav/latest/report.json，逐帧 decisions.jsonl、退出保存的 map.npz；每轮验收用 --output 绝对新目录。默认latest报告和历史文件在新一轮覆盖，不是归档目录。已知导航启用被拒绝或服务缺失时不会stop别人的Action；已取得控制或启用结果不确定时按停止策略清理。
+
+PROCESSING_EXPIRED退出时，report.json的last_decision保留触发帧：input_age_sec为进入Agent时的图像年龄，agent_sec为Agent调用耗时，source_age_sec为处理完成时图像年龄，processing_sec含读取/配对/处理。先看哪一段超出预算；不能只根据错误名称认定FMM耗时过长。服务发现和服务响应各自有限等待（默认各2s），不影响0.3s导航请求有效期，失败不重发运动决定。
 
 只读清地图服务：
 

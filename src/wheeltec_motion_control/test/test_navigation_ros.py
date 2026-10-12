@@ -1,6 +1,8 @@
 """Isolated ROS wire-contract tests: only /motion_test/* and synthetic poses."""
 import time
 import threading
+import subprocess
+import sys
 
 from geometry_msgs.msg import TwistStamped
 from rclpy.parameter import Parameter
@@ -278,6 +280,20 @@ class NavigationRosTests(RosHarness):
             self.idle('explicitly disabled')
         finally:
             adapter.destroy_node()
+
+    def test_documented_module_stop_entrypoint_executes_and_reports_failure(self):
+        self.assertTrue(self.mode().success)
+        completed = subprocess.run([sys.executable, '-m',
+            'wheeltec_motion_control.navigation_client', 'stop', '--prefix', '/motion_test'],
+            capture_output=True, text=True, timeout=10)
+        self.assertEqual(completed.returncode, 0, completed.stderr + completed.stdout)
+        self.assertIn('stop', completed.stdout.lower())
+        self.idle('stop service')
+        missing = subprocess.run([sys.executable, '-m',
+            'wheeltec_motion_control.navigation_client', 'stop', '--prefix', '/absent_motion_test'],
+            capture_output=True, text=True, timeout=10)
+        self.assertNotEqual(missing.returncode, 0)
+        self.assertIn('unavailable', missing.stdout)
 
     def test_adapter_enable_rejection_does_not_stop_existing_action(self):
         handle = self.send(1.)
