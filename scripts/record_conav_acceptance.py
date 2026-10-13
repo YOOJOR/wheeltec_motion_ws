@@ -11,6 +11,8 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist,TwistStamped
 from nav_msgs.msg import Odometry
+from sensor_msgs.msg import Image
+from wheeltec_rgbd_interfaces.msg import RGBDFrame
 from std_msgs.msg import String
 from wheeltec_motion_interfaces.msg import MotionStatus
 from wheeltec_rgbd.posed import transform
@@ -22,13 +24,28 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--duration',type=float,default=60.)
     p.add_argument('--output',type=Path,required=True)
+    p.add_argument('--sensor-timing',action='store_true',help='Also observe Astra raw image and RGB-D header arrival times; never store image pixels')
     args=p.parse_args()
     if not math.isfinite(args.duration) or not 0<args.duration<=120:p.error('duration must be (0,120]')
     args.output.parent.mkdir(parents=True,exist_ok=True)
     config=Path(__file__).parents[1]/'src/wheeltec_motion_control/config/motion_control.yaml'
     offset=np.array(yaml.safe_load(config.read_text())['wheeltec_motion_controller']['ros__parameters']['body_from_base_translation'])
     rclpy.init();node=Node('conav_acceptance_recorder')
-    commands=[];poses=[];decisions=[];states=[];requests=[]
+    commands=[];poses=[];decisions=[];states=[];requests=[];sensor_timing=[]
+    def sensor(kind,msg):
+        now=node.get_clock().now().nanoseconds
+        stamp=lambda h:h.stamp.sec*10**9+h.stamp.nanosec
+        row={'kind':kind,'received_ros_ns':now,'received_monotonic':time.monotonic(),
+             'source_stamp_ns':stamp(msg.header),'header_age_sec':(now-stamp(msg.header))/1e9}
+        if kind=='rgbd':
+            row.update(color_stamp_ns=stamp(msg.color.header),depth_stamp_ns=stamp(msg.depth.header),
+                       sequence=msg.sequence,pairing_delta_sec=msg.pairing_delta_sec,
+                       oldest_image_age_sec=(now-min(stamp(msg.color.header),stamp(msg.depth.header)))/1e9)
+        sensor_timing.append(row)
+    if args.sensor_timing:
+        node.create_subscription(Image,'/wheeltec_camera/raw/color/image_raw',lambda m:sensor('raw_color',m),latest_qos())
+        node.create_subscription(Image,'/wheeltec_camera/raw/depth/image_raw',lambda m:sensor('raw_depth',m),latest_qos())
+        node.create_subscription(RGBDFrame,'/wheeltec_camera/rgbd',lambda m:sensor('rgbd',m),latest_qos())
     def odometry(m):
         xyz,q=m.pose.pose.position,m.pose.pose.orientation
         matrix=transform([xyz.x,xyz.y,xyz.z],[q.x,q.y,q.z,q.w])
@@ -70,9 +87,13 @@ def main():
             'base_path_length_m':float(np.linalg.norm(np.diff([v[1] for v in poses],axis=0),axis=1).sum()) if poses else None,
             'yaw_change_rad':float(yaw[-1]-yaw[0]) if len(yaw) else None,
             'yaw_total_abs_rad':float(np.abs(np.diff(yaw)).sum()) if len(yaw) else None,
-            'physical_stop_measured':False}
+            'physical_stop_measured':False,
+            'sensor_timing_enabled':args.sensor_timing,
+            'sensor_timing':{kind:{'count':len(rows),'header_age_max_sec':max(r['header_age_sec'] for r in rows),
+                'header_age_p95_sec':float(np.percentile([r['header_age_sec'] for r in rows],95))}
+                for kind in ('raw_color','raw_depth','rgbd') if (rows:=[r for r in sensor_timing if r['kind']==kind])}}
         args.output.write_text(json.dumps(result,indent=2)+'\n')
-        args.output.with_suffix('.samples.json').write_text(json.dumps({'commands':commands,'poses':poses,'decisions':decisions,'states':states,'requests':requests})+'\n')
+        args.output.with_suffix('.samples.json').write_text(json.dumps({'commands':commands,'poses':poses,'decisions':decisions,'states':states,'requests':requests,'sensor_timing':sensor_timing})+'\n')
         print(json.dumps(result,indent=2))
         node.destroy_node();rclpy.shutdown()
 

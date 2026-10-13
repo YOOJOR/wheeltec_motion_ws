@@ -4,6 +4,8 @@
 
 最新验收状态（2026-10-12）：前一轮短程链路通过，但扩大到60s/0.5m/10rad后的测试出现运动时图像迟到并保护停止，持续探索尚未通过。当前应先排查输入时序，不直接扩大活动范围。人工停止模块入口和服务等待问题已修复；案例见VALIDATION最新节。
 
+2026-10-13更新：一次实际左转后RGB-D断更，原始图像仍持续；适配器报告NO_USABLE_DEPTH。停车后原始正深度全部大于3m，不在当前0.4–2m接受范围，故未发布可用观测；不能把这种现象直接归为传感器停流。持续探索仍未通过，后续先验证深度范围与无近处点的处理，尚未修改范围。
+
 ## 1. 三个分别启动的程序
 
 以下入口都不会因执行 --check 而移动。先分别打开终端：
@@ -95,6 +97,8 @@ source /opt/ros/humble/setup.bash
 source install/local_setup.bash
 python3 scripts/record_conav_acceptance.py --duration 60 --output runtime_logs/conav/acceptance/my-run.json
 ```
+
+奥比时间链诊断可增加 `--sensor-timing`，同时记录原始彩色、原始深度与原子RGB-D的源时间/旁路回调到达时间，保存在.samples.json的sensor_timing中，不保存像素。该选项会额外订阅大消息，使用时关注负载；默认关闭。它帮助按同一帧关联延迟，但不能替代驱动曝光时间或Agent内部排队的精确测量。RGB-D断更时还应查看/wheeltec_camera/status中的NO_USABLE_DEPTH等具体原因。
 
 记录命令上限、唯一/cmd_vel发布者、源码决策、位姿变化及最终输出。位姿累计路径/转角包含定位噪声，不等于真实里程；优先看前后变化和时序。Agent报告默认 runtime_logs/conav/latest/report.json，逐帧 decisions.jsonl、退出保存的 map.npz；每轮验收用 --output 绝对新目录。默认latest报告和历史文件在新一轮覆盖，不是归档目录。已知导航启用被拒绝或服务缺失时不会stop别人的Action；已取得控制或启用结果不确定时按停止策略清理。
 
