@@ -1,5 +1,11 @@
 # 阶段总结：运动接口与原版 Co-NavGPT2 探索适配
 
+## 2026-10-15：仓库整理与日志清理
+
+采用两个大仓库：motion与nav；nav直接跟踪development/Co-NavGPT2源码，原独立仓库历史已并入，upstream继续忽略并由scripts/fetch_upstream.py按锁定版本获取。原内层Git元数据在workspace/archive/git-metadata-20261015/Co-NavGPT2.git备份。此前三分支上传方案取消，未推送。电脑端步骤见REVIEW_ON_PC.md。
+
+清理超过24小时的pip下载缓存、构建日志和运行文本日志，共1156个文件、227560807字节（约217MiB）。保留标定信息、结构化实机记录和验证目录；旧文档指向的部分文本日志已按本次要求清除。清理清单在runtime_logs/maintenance/cleanup-20261015.json。未修改算法或启动硬件。
+
 ## 2026-10-15：厂家 base_link 坐标迁移
 
 当前控制参考点为厂家四轮几何中心 base_link，base_footprint 在其下方0.026m。相机采用厂家 senior_mec_bs URDF 的 camera_joint，base_link 下平移[0.16083451891873,0.000745202407130424,0.089704]m、零RPY，组合离地0.115704m。光学轴转换保持显式；confirmed=false表示物理投影仍待验收，不再使用人工高度覆盖。
