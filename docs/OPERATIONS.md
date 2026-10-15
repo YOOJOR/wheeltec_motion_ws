@@ -1,5 +1,12 @@
 > 2026-10-12：原版Agent源码适配已成为主探索路径，按 [SOURCE_AGENT](SOURCE_AGENT.md) 分别启动基础栈、奥比接口、原版Agent及RViz。相对Action教程仍适用；旧探索预览作为测试入口保留。主探索默认不输出速度，运动需显式 --motion 和有限预算。
 
+## 2026-10-15：厂家 base_link 坐标迁移
+
+当前控制参考点为厂家四轮几何中心 base_link，base_footprint 在其下方0.026m。相机采用厂家 senior_mec_bs URDF 的 camera_joint，base_link 下平移[0.16083451891873,0.000745202407130424,0.089704]m、零RPY，组合离地0.115704m。光学轴转换保持显式；confirmed=false表示物理投影仍待验收，不再使用人工高度覆盖。
+
+MID360S为后装：body_from_base=[-0.10718,-0.02237,-0.17788]m、零RPY；XY经用户同意暂作安装估计，来自旧旋转拟合，未独立测量到厂家几何中心。厂家laser_link和通用radar不用于FAST-LIO。旧记录中的wheeltec_base/地面原点及-0.20388为历史配置，以本节为准。没有改变速度/加速度/超时、深度范围、相机内参或FAST-LIO内部外参。
+
+
 # 使用与调试
 
 当前上下文见 STAGE_SUMMARY。所有命令在小车 Ubuntu 22.04 / Humble 上运行；开发机没有原生 ROS。`motion_control.yaml` 是第一台车已启用输出的配置，新车先使用禁用的 example。

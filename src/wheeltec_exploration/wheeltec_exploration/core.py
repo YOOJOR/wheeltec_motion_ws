@@ -5,10 +5,12 @@ import cv2
 import numpy as np
 from scipy import ndimage
 from wheeltec_rgbd.posed import rigid
+from wheeltec_rgbd.frame_tree import ground_point
 
 
 @dataclass(frozen=True)
 class Config:
+    base_height: float = 0.0
     exploration_policy: str = 'paper_frontier'
     initial_scan_angle: float = 2*math.pi
     initial_scan_timeout: float = 45.
@@ -407,7 +409,8 @@ class Explorer:
         if not len(points): return Decision('NO_USABLE_DEPTH')
         world = points @ camera[:3,:3].T+camera[:3,3]
         try:
-            self.grid.update(world,camera[:3,3],base[:3,3])
+            ground = ground_point(base,self.cfg.base_height)[:3]
+            self.grid.update(world,camera[:3,3],ground)
             result = self.initial_scan(base,monotonic)
             if result is None: result = self.plan(base,monotonic)
         except ValueError as exc:

@@ -101,3 +101,11 @@ bash scripts/start_debug_rviz.sh --camera d455
 仅将两个图像窗口切换到独立 D455 raw 话题，深度显示范围改为 400–6000 mm；生成配置在 `runtime_logs/visualization/d455_debug.rviz`。它不启动 D455、不替换外参，也不让缺少安装外参的 D455 获得世界建图能力。当前 baseline 仍使用奥比。
 
 本入口可辅助核验真实几何和观察规划，不能证明自主探索、外参精度、避障或物理停车已通过。当前软件/实车验证结果见 VALIDATION。
+
+## 2026-10-15 安装 TF
+
+start_debug_rviz.sh现在同时启动只读安装TF发布进程，并在RViz关闭时退出。--check只验证配置、不启动ROS节点。变换读取原版适配wheeltec/config.yaml及其引用的motion_control.yaml，与内部计算共用配置；同一用户仅允许一个该发布进程。
+
+FAST-LIO提供camera_init→body；可视化提供body→base_link→base_footprint及base_link→camera_link→wheeltec_camera_link→wheeltec_camera_color_optical_frame。控制与建图不依赖该可视化进程。奥比自研launch关闭厂家驱动TF，避免重复发布光学帧；只发布当前已配准RGB-D实际使用的光学帧，不伪造其他流的外参。D455只显示底盘安装链，不连接未配置的相机到机器人。
+
+不要叠加厂家整车TF入口：其URDF camera_joint父帧为base_link，而静态发布器又给camera_link指定base_footprint；laser与laser_link也不同。厂家文件未修改，自研只复用URDF相机几何。旧运行中的相机驱动需退出后使用新launch启动；重启所有消费者并丢弃旧地图，不将两版坐标混用。

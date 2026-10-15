@@ -33,6 +33,9 @@ done
 case "$rviz_camera" in astra_s|d455) ;; *) echo 'Camera must be astra_s or d455.' >&2; exit 2 ;; esac
 case "$rviz_backend" in source_agent|test_preview) ;; *) echo 'Backend must be source_agent or test_preview.' >&2; exit 2 ;; esac
 source /opt/ros/humble/setup.bash
+source "$rviz_root/install/local_setup.bash"
+rviz_geometry_config="$rviz_root/../conavgpt2_ws/development/Co-NavGPT2/wheeltec/config.yaml"
+python3 -m wheeltec_rgbd.frame_tree --config "$rviz_geometry_config" --camera "$rviz_camera" --check
 [[ -x /opt/ros/humble/lib/rviz2/rviz2 ]] || { echo 'RViz2 is not installed.' >&2; exit 1; }
 rviz_config="$rviz_root/config/rviz/exploration_debug.rviz"
 # D455 changes image inputs only; never substitutes unverified camera TF.
@@ -89,6 +92,9 @@ export ROS_LOG_DIR="$rviz_root/runtime_logs/visualization/ros"
 mkdir -p "$ROS_LOG_DIR"
 echo 'Paper map: white=observed non-obstacle, black=obstacle, gray=unknown (may participate in planning).'
 echo 'Cyan=frontier edges, yellow=candidates, green=goal, orange=short-term goal; text shows scan progress.'
-echo 'Odometry shows the FAST-LIO IMU/body reference point, not wheeltec_base.'
+echo 'Odometry shows the FAST-LIO IMU/body reference point, not base_link.'
 echo 'Use /wheeltec_conav/decision for the original Agent, /wheeltec_exploration/decision for the test preview.'
-exec ros2 run rviz2 rviz2 -d "$rviz_config"
+python3 -m wheeltec_rgbd.frame_tree --config "$rviz_geometry_config" --camera "$rviz_camera" &
+rviz_tf_pid=$!
+trap 'kill -TERM "$rviz_tf_pid" 2>/dev/null || true; wait "$rviz_tf_pid" 2>/dev/null || true' EXIT
+ros2 run rviz2 rviz2 -d "$rviz_config"

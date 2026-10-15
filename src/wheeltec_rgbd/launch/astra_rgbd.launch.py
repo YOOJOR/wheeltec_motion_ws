@@ -27,7 +27,7 @@ def generate_launch_description():
                       'depth_width': 640, 'depth_height': 480, 'depth_fps': 30,
                       'depth_registration': True, 'color_depth_synchronization': True,
                       'enable_point_cloud': False, 'enable_colored_point_cloud': False,
-                      'publish_tf': True, 'tf_publish_rate': 10.0,
+                      'publish_tf': False, 'tf_publish_rate': 10.0,
                       'enable_d2c_viewer': False, 'enable_publish_extrinsic': False,
                       'color_qos': 'SENSOR_DATA', 'depth_qos': 'SENSOR_DATA',
                       'color_camera_info_qos': 'SENSOR_DATA',

@@ -34,7 +34,7 @@ SETTINGS = {
     'navigation_mode_service': '/wheeltec_motion/navigation/set_enabled',
     'status_topic': '/wheeltec_motion/status',
     # A semantic chassis control reference, NOT an assertion that TF exists.
-    'navigation_frame': 'wheeltec_base',
+    'navigation_frame': 'base_link',
     'world_frame': 'camera_init',
     'body_frame': 'body',
     'control_enabled': False,

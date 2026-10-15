@@ -21,7 +21,9 @@ def load_configuration(path, camera=None):
     values['camera'] = selected
     values['extrinsics_source'] = camera_cfg['source']
     values['extrinsics_confirmed'] = camera_cfg['confirmed'] is True
-    values['map_config'] = Config(**values.get('map',{}))
+    map_values = dict(values.get('map',{}))
+    map_values['base_height'] = values.get('base_height',0.0)
+    values['map_config'] = Config(**map_values)
     if not values['prefix'].startswith('/') or values['prefix'].rstrip('/') in ('','/cmd_vel','/wheeltec_motion'):
         raise ValueError('INVALID_PREVIEW_PREFIX')
     return values

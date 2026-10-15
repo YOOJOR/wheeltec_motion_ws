@@ -36,7 +36,7 @@ def decision_velocity(decision, forward_speed=.12, turn_speed=.30):
 
 
 class NavigationClient(Node):
-    def __init__(self, prefix='/wheeltec_motion', frame='wheeltec_base',
+    def __init__(self, prefix='/wheeltec_motion', frame='base_link',
                  forward_speed=.12, turn_speed=.30, command_timeout=.3,
                  status_timeout=.6):
         super().__init__('wheeltec_navigation_adapter')

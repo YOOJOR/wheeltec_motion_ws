@@ -10,7 +10,7 @@ from wheeltec_motion_control.navigation import NavigationController
 class NavigationTests(unittest.TestCase):
     def setUp(self):
         self.config = replace(Config(), linear_accel=0.3, angular_accel=1.0)
-        self.nav = NavigationController(self.config, 'wheeltec_base')
+        self.nav = NavigationController(self.config, 'base_link')
         self.now = 0.0
         self.epoch = 10**12
         self.nav.enable(self.now, self.epoch)
@@ -20,7 +20,7 @@ class NavigationTests(unittest.TestCase):
 
     def request(self, vx=0.1, wz=0.0, **kw):
         return self.nav.accept(kw.get('components', (vx, 0., 0., 0., 0., wz)),
-                               kw.get('stamp', self.stamp()), kw.get('frame', 'wheeltec_base'),
+                               kw.get('stamp', self.stamp()), kw.get('frame', 'base_link'),
                                self.now, kw.get('ros_now', self.stamp()))
 
     def tick(self, dt=0.05, pose=True, ros_now=None):
@@ -155,7 +155,7 @@ class NavigationTests(unittest.TestCase):
                 self.assertEqual(self.nav.command, Command())
 
     def test_wrong_or_empty_frame_fails_stop(self):
-        for frame in ('', 'base_link', 'camera_init', 'body'):
+        for frame in ('', 'wheeltec_base', 'camera_init', 'body'):
             self.setUp()
             self.start_moving()
             self.assertFalse(self.request(frame=frame))

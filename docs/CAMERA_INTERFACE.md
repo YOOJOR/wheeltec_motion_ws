@@ -1,5 +1,12 @@
 # 自研 ASTRA S RGB-D 接口
 
+## 2026-10-15：厂家 base_link 坐标迁移
+
+当前控制参考点为厂家四轮几何中心 base_link，base_footprint 在其下方0.026m。相机采用厂家 senior_mec_bs URDF 的 camera_joint，base_link 下平移[0.16083451891873,0.000745202407130424,0.089704]m、零RPY，组合离地0.115704m。光学轴转换保持显式；confirmed=false表示物理投影仍待验收，不再使用人工高度覆盖。
+
+MID360S为后装：body_from_base=[-0.10718,-0.02237,-0.17788]m、零RPY；XY经用户同意暂作安装估计，来自旧旋转拟合，未独立测量到厂家几何中心。厂家laser_link和通用radar不用于FAST-LIO。旧记录中的wheeltec_base/地面原点及-0.20388为历史配置，以本节为准。没有改变速度/加速度/超时、深度范围、相机内参或FAST-LIO内部外参。
+
+
 D455 已新增独立启动和配置，继续使用同一 RGBDFrame/Reader 接口，见 [D455_INTERFACE](D455_INTERFACE.md)。奥比仍为 baseline 默认；D455 使用独立话题和帧，上层通过 camera 选项选择。
 
 首版 2026-10-01。复用本机已安装的 Astra/OpenNI 底层驱动及现有标定文件，使用自研 wheeltec_rgbd 做配对、校验、深度单位/范围转换及最新观测读取。只启动相机，不启动厂家整车、EKF、跟随、SLAM、Nav2，不发布 /cmd_vel。厂家的完整功能包只作参考。
@@ -77,7 +84,7 @@ except NoFreshFrame:
 
 原版上游图像 callback 写死 uint16 和紧凑 stride，不能只改订阅话题就接入本 32FC1 输出。应使用上述适配入口；不要把 depth_m 直接交给会再次除以 1000 的原版预处理。该兼容函数只转换观测，不启动 Agent、不连接 Go2、不发速度，也不提供位置/朝向。
 
-本机现有 YAML 已用于初步取流和去畸变，设备归属与实际精度仍需核对；相机装到车体后的外参也需核对。驱动只发布相机内部 TF，本接口不发布 camera_init/body/wheeltec_base 关系，不从厂家车型模板生成未经实测的车体 TF。光学轴按 ROS 相机约定处理：x 向右、y 向下、z 向前；世界坐标投影需上层结合正确外参和位姿。
+本机现有 YAML 已用于初步取流和去畸变，设备归属与实际精度仍需核对；相机装到车体后的外参也需核对。驱动只发布相机内部 TF，本接口不发布 camera_init/body/base_link 关系，不从厂家车型模板生成未经实测的车体 TF。光学轴按 ROS 相机约定处理：x 向右、y 向下、z 向前；世界坐标投影需上层结合正确外参和位姿。
 
 本阶段完成相机初步接口，尚未完成现有标定文件的设备归属、物理像素配准误差、长时间稳定性、车体外参、运动场景建图或 Co-NavGPT2 自主探索验收。
 
@@ -85,7 +92,7 @@ except NoFreshFrame:
 
 ## RGB-D 与 FAST-LIO 位姿衔接（2026-10-01）
 
-新增只读 `wheeltec_rgbd.posed.PosedRGBDReader`，继承 RGBDReader；同时订阅 `/Odometry`，要求 camera_init/body，返回 PosedObservation。调用方提供完整的 4×4 `body_from_base`、`base_from_camera`，并显式设置 `extrinsics_confirmed=True`。后者表示相机**彩色光学坐标系**到 wheeltec_base 的刚体变换，不是相机外壳原点；不得用单位矩阵占位后确认。第一台车 body_from_base 从当前 motion_control.yaml 的平移/RPY 构造，不能用厂家车型模板代替。真实相机外参目前仍未确认，所以本轮只验证合成数据。
+新增只读 `wheeltec_rgbd.posed.PosedRGBDReader`，继承 RGBDReader；同时订阅 `/Odometry`，要求 camera_init/body，返回 PosedObservation。调用方提供完整的 4×4 `body_from_base`、`base_from_camera`，并显式设置 `extrinsics_confirmed=True`。后者表示相机**彩色光学坐标系**到 base_link 的刚体变换，不是相机外壳原点；不得用单位矩阵占位后确认。第一台车 body_from_base 从当前 motion_control.yaml 的平移/RPY 构造，不能用厂家车型模板代替。真实相机外参目前仍未确认，所以本轮只验证合成数据。
 
 ```python
 from wheeltec_rgbd.posed import PosedRGBDReader

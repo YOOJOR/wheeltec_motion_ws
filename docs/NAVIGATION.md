@@ -17,9 +17,9 @@
 
 ## 坐标系与时间
 
-- `header.frame_id` 必须严格为配置 `navigation_frame`（默认 `wheeltec_base`）；速度定义在当前底盘控制参考点：地面有效旋转中心，x 朝前、z 朝上。`linear.x` 单位 m/s，正前进、负后退；`angular.z` 单位 rad/s，正左转、负右转。两者可同时非零。
+- `header.frame_id` 必须严格为配置 `navigation_frame`（默认 `base_link`）；速度定义在当前底盘控制参考点：地面有效旋转中心，x 朝前、z 朝上。`linear.x` 单位 m/s，正前进、负后退；`angular.z` 单位 rad/s，正左转、负右转。两者可同时非零。
 - `linear.y/z`、`angular.x/y` 必须全部为零，即使本底盘具备麦轮横移能力，首版导航也不接受横移。六个分量均须有限。
-- 这个 frame 名称只标明输入语义。控制器不广播 TF，填写 `wheeltec_base` 或 `base_link` 不会建立 TF 链。
+- 这个 frame 名称只标明输入语义。控制器不广播 TF，填写 `base_link` 或 `base_link` 不会建立 TF 链。
 - `header.stamp` 是上层新鲜请求的原始 ROS 时间，不能为空，须严格递增且晚于本次启用时刻。客户端与服务器用同一 ROS 时钟；分机运行须同步系统时间，不能填写单调时钟。客户端示例保留新观测/决策的原始时间，禁止给缓存决策换一个“现在”的时间戳。
 - 主源码Agent分别记录图像采集时间 source_stamp_ns 与新决策开始时间 decision_stamp_ns；速度请求 header 使用后者，在开始处理一组新的有效观测时取得，不能在计算结束或重发时重新打戳。图像年龄和处理耗时仍独立各限0.3s，过期输入不允许发送运动。这样请求时效与传感器时效有各自明确的起点。
 - 请求在接收时和每次输出时同时检查源年龄；收到后再用单调时钟检查有效期。允许源时间最多超前 0.1 s；源年龄或接收年龄超过 0.3 s 则停止。延迟到达的请求不会获得额外完整寿命。ROS 时钟大幅后退或前跳也会导致失效停止。
@@ -58,7 +58,7 @@
 | --- | --- | --- |
 | navigation_command_timeout | 0.3 s | 导航源时间与单调接收年龄上限，独立于 pose_timeout=0.5 s |
 | navigation_future_stamp_tolerance | 0.1 s | 导航请求源时间允许超前量，独立于位姿 future_stamp_tolerance |
-| navigation_frame | wheeltec_base | 底盘控制参考点语义标签 |
+| navigation_frame | base_link | 底盘控制参考点语义标签 |
 | navigation_topic | /wheeltec_motion/navigation/cmd_vel | 输入话题 |
 | navigation_mode_service | /wheeltec_motion/navigation/set_enabled | 模式服务 |
 | status_topic | /wheeltec_motion/status | 状态话题 |
@@ -142,3 +142,5 @@ finally:
 ## 本轮验证与待试车项
 
 完整记录见 VALIDATION。自动验证只使用独立 ROS 域 173/174、合成位姿和 `/motion_test/*`，未发送实车运动指令。实车仍需用户验证：持续运动/换向响应、上层实际处理周期与 watchdog 命中、主动/失效后的物理停车、真实定位异常恢复，以及接相机后的坐标变换。软件接口完成不代表 Co-NavGPT2 自主探索已跑通。
+
+2026-10-15迁移：请求header.frame_id必须为base_link；旧wheeltec_base被拒绝并遵循非法请求停止策略。话题、Action及停止服务名不变。TF可视化不是控制器运行前提。

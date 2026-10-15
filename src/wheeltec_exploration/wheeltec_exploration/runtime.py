@@ -20,6 +20,7 @@ from wheeltec_rgbd.client import RGBDReader, NoFreshFrame
 from wheeltec_rgbd.posed import PoseWindow, PosedObservation, transform, rigid
 from wheeltec_rgbd.core import stamp_ns
 from wheeltec_rgbd.node import latest_qos
+from wheeltec_rgbd.frame_tree import ground_point
 from .configuration import load_configuration
 from .core import Explorer, Decision
 from .upstream import load_fmm, LOCKED_COMMIT
@@ -219,7 +220,7 @@ def run(node, engine, duration=0., output=None, perception=None):
                 if engine.halted is None:
                     last_stamp,last_good = obs.stamp_ns,loop
                     processed += 1
-                    floor_z = posed.world_from_base[2,3]
+                    floor_z = ground_point(posed.world_from_base,node.config["map_config"].base_height)[2]
                 source_age = (node.get_clock().now().nanoseconds-min(obs.color_stamp_ns,obs.depth_stamp_ns))/1e9
                 elapsed = time.monotonic()-loop
                 if source_age > .3 or elapsed > .3:

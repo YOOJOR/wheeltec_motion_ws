@@ -1,5 +1,12 @@
 # 原版 Co-NavGPT2 Agent：探索、可视化与现场验收
 
+## 2026-10-15：厂家 base_link 坐标迁移
+
+当前控制参考点为厂家四轮几何中心 base_link，base_footprint 在其下方0.026m。相机采用厂家 senior_mec_bs URDF 的 camera_joint，base_link 下平移[0.16083451891873,0.000745202407130424,0.089704]m、零RPY，组合离地0.115704m。光学轴转换保持显式；confirmed=false表示物理投影仍待验收，不再使用人工高度覆盖。
+
+MID360S为后装：body_from_base=[-0.10718,-0.02237,-0.17788]m、零RPY；XY经用户同意暂作安装估计，来自旧旋转拟合，未独立测量到厂家几何中心。厂家laser_link和通用radar不用于FAST-LIO。旧记录中的wheeltec_base/地面原点及-0.20388为历史配置，以本节为准。没有改变速度/加速度/超时、深度范围、相机内参或FAST-LIO内部外参。
+
+
 当前主代码在 `~/workspace/conavgpt2_ws/development/Co-NavGPT2` 的 wheeltec-adaptation 分支，直接运行源码 ROS_Agent.mapping()。目标识别暂时关闭，VLM不接入；最近前沿/无前沿随机目标、点云建图、FMM和动作选择由原版Agent执行。`src/wheeltec_exploration` 是此前测试实现，作为对照保留，不能当作原版Agent。
 
 最新验收状态（2026-10-12）：前一轮短程链路通过，但扩大到60s/0.5m/10rad后的测试出现运动时图像迟到并保护停止，持续探索尚未通过。当前应先排查输入时序，不直接扩大活动范围。人工停止模块入口和服务等待问题已修复；案例见VALIDATION最新节。

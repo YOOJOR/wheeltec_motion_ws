@@ -36,7 +36,7 @@ class NavigationRosTests(RosHarness):
         req.data = enabled
         return self.result(self.mode_client.call_async(req))
 
-    def message(self, vx=.1, wz=0., offset=0., frame='wheeltec_base', stamp=None):
+    def message(self, vx=.1, wz=0., offset=0., frame='base_link', stamp=None):
         msg = TwistStamped()
         ns = self.plant.get_clock().now().nanoseconds+int(offset*1e9) if stamp is None else stamp
         msg.header.stamp.sec, msg.header.stamp.nanosec = divmod(ns, 10**9)
@@ -170,7 +170,7 @@ class NavigationRosTests(RosHarness):
 
     def test_new_invalid_requests_fail_stop_on_wire(self):
         cases = ({'vx': float('nan')}, {'wz': float('inf')}, {'frame': ''},
-                 {'frame': 'base_link'}, {'vx': .151}, {'wz': -.351}, {'offset': .2})
+                 {'frame': 'wheeltec_base'}, {'vx': .151}, {'wz': -.351}, {'offset': .2})
         for case in cases:
             with self.subTest(case=case):
                 self.moving()

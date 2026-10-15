@@ -10,7 +10,7 @@ wheeltec_motion_controller:
     navigation_topic: /wheeltec_motion/navigation/cmd_vel
     navigation_mode_service: /wheeltec_motion/navigation/set_enabled
     status_topic: /wheeltec_motion/status
-    navigation_frame: wheeltec_base # 底盘控制参考点标签；不代表已发布 TF
+    navigation_frame: base_link # 底盘控制参考点标签；不代表已发布 TF
     world_frame: camera_init
     body_frame: body
     # T_body_base: 底盘参考点在 IMU/body 中的位置(m)，及底盘轴转到 body 轴的 RPY(rad)。

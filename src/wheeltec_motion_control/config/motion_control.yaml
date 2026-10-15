@@ -11,12 +11,13 @@ wheeltec_motion_controller:
     navigation_topic: /wheeltec_motion/navigation/cmd_vel
     navigation_mode_service: /wheeltec_motion/navigation/set_enabled
     status_topic: /wheeltec_motion/status
-    navigation_frame: wheeltec_base # 底盘控制参考点标签；不代表已发布 TF
+    navigation_frame: base_link # 底盘控制参考点标签；不代表已发布 TF
     world_frame: camera_init
     body_frame: body
     # T_body_base: 底盘参考点在 IMU/body 中的位置(m)，及底盘轴转到 body 轴的 RPY(rad)。
-    # base 为地面上的有效旋转中心；XY 来自旋转录包拟合，Z 来自安装高度。
-    body_from_base_translation: [-0.10718, -0.02237, -0.20388]
+    # base 为厂家四轮几何中心 base_link；XY 暂保留拟合作为安装估计，未独立测量到几何中心。
+    # Z 由旧地面参考 -0.20388 加厂家底盘高度 0.026 得到。
+    body_from_base_translation: [-0.10718, -0.02237, -0.17788]
     body_from_base_rpy: [0.0, 0.0, 0.0]
 
     control_rate_hz: 20.0

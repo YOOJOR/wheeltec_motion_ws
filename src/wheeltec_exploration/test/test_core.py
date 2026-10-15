@@ -78,8 +78,8 @@ def test_provisional_preview_height_is_explicitly_unconfirmed_and_d455_refused()
     path=Path(__file__).parents[1]/'config/astra_preview.yaml'
     cfg=load_configuration(path)
     assert cfg['camera']=='astra_s' and not cfg['extrinsics_confirmed']
-    assert cfg['base_from_camera'][2,3] == .1157
-    np.testing.assert_allclose(cfg['body_from_base'][:3,3],[-.10718,-.02237,-.20388])
+    assert cfg['base_from_camera'][2,3] == .089704
+    np.testing.assert_allclose(cfg['body_from_base'][:3,3],[-.10718,-.02237,-.17788])
     with pytest.raises(ValueError,match='NOT_CONFIGURED'): load_configuration(path,'d455')
 
 
