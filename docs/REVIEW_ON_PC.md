@@ -4,11 +4,11 @@
 
 ## 获取
 
-GitHub目标仓库由用户确认后填写。分别克隆两个仓库到并列目录：
+已确认GitHub目标为YOOJOR/wheeltec_motion_ws和YOOJOR/conavgpt2_ws。分别克隆两个仓库到并列目录：
 
 ```bash
-git clone <motion仓库地址> wheeltec_motion_ws
-git clone <nav仓库地址> conavgpt2_ws
+git clone https://github.com/YOOJOR/wheeltec_motion_ws.git wheeltec_motion_ws
+git clone https://github.com/YOOJOR/conavgpt2_ws.git conavgpt2_ws
 cd conavgpt2_ws
 python3 scripts/fetch_upstream.py
 ```
