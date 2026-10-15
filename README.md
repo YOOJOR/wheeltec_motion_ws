@@ -90,3 +90,5 @@ bash scripts/build_and_test.sh
 D455 现已接入统一 RGB-D 接口，启动、取流验证和 Python 使用见 [D455_INTERFACE](docs/D455_INTERFACE.md)。
 
 当前坐标契约（2026-10-15）：控制与相机安装统一base_link；迁移说明见docs/STAGE_SUMMARY.md及docs/VISUALIZATION.md。旧wheeltec_base导航请求不再接受。
+
+完整代码下载与阅读顺序：[个人电脑审阅指南](docs/REVIEW_ON_PC.md)。GitHub三个分支分别保存接口、部署与完整原版适配源码。
