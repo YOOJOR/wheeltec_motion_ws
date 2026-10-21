@@ -1,6 +1,4 @@
-"""ROS 2 Humble action server. No serial access and no TF broadcasting."""
-
-from dataclasses import fields
+"""运动控制：导航速度、相对直行/转角及 ROS 接口，单位 m、rad、s。"""
 import math
 import signal
 import threading
@@ -13,396 +11,371 @@ from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from rclpy.signals import SignalHandlerOptions
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
-from rcl_interfaces.msg import SetParametersResult
+from rcl_interfaces.msg import ParameterDescriptor
 from geometry_msgs.msg import Twist, TwistStamped
 from nav_msgs.msg import Odometry
 from std_srvs.srv import Trigger, SetBool
 from wheeltec_motion_interfaces.action import ExecuteMotion
 from wheeltec_motion_interfaces.msg import MotionStatus
 
-from .core import (Config, Controller, Goal, Command, chassis_pose, SUCCEEDED,
-                   CANCELED, STOPPED, INTERNAL_ERROR)
-from .navigation import NavigationController
-
-
-SETTINGS = {
-    'odom_topic': '/Odometry',
-    'cmd_vel_topic': '/cmd_vel',
-    'action_name': '/wheeltec_motion/execute',
-    'stop_service': '/wheeltec_motion/stop',
-    'navigation_topic': '/wheeltec_motion/navigation/cmd_vel',
-    'navigation_mode_service': '/wheeltec_motion/navigation/set_enabled',
-    'status_topic': '/wheeltec_motion/status',
-    # A semantic chassis control reference, NOT an assertion that TF exists.
-    'navigation_frame': 'base_link',
-    'world_frame': 'camera_init',
-    'body_frame': 'body',
+CONTROL_PERIOD, FEEDBACK_PERIOD, FUTURE_TOLERANCE = 0.05, 0.2, 0.1
+ZERO = (0.0, 0.0)
+DEFAULTS = {
     'control_enabled': False,
     'extrinsics_calibrated': False,
+    'navigation_frame': 'base_link',
     'body_from_base_translation': [0.0, 0.0, 0.0],
     'body_from_base_rpy': [0.0, 0.0, 0.0],
+    'max_linear_speed': 0.15,
+    'max_angular_speed': 0.35,
+    'linear_accel': 0.15,
+    'angular_accel': 0.5,
+    'distance_gain': 0.8,
+    'heading_gain': 1.5,
+    'rotation_gain': 1.2,
+    'distance_tolerance': 0.03,
+    'angle_tolerance': 0.035,
+    'pose_timeout': 0.5,
+    'navigation_command_timeout': 0.3,
+    'default_timeout': 45.0,
 }
-RESTART_ONLY = {'odom_topic', 'cmd_vel_topic', 'action_name', 'stop_service',
-                'control_rate_hz', 'feedback_rate_hz', 'use_sim_time',
-                'navigation_topic', 'navigation_mode_service', 'status_topic',
-                'navigation_frame'}
+
+
+def clamp(value, limit):
+    return max(-limit, min(limit, value))
+
+
+def wrap(angle):
+    return math.atan2(math.sin(angle), math.cos(angle))
+
+
+def quaternion_product(a, b):
+    x, y, z, w = a
+    X, Y, Z, W = b
+    return (w*X+x*W+y*Z-z*Y, w*Y-x*Z+y*W+z*X,
+            w*Z+x*Y-y*X+z*W, w*W-x*X-y*Y-z*Z)
+
+
+def chassis_pose(position, quaternion, translation, rpy):
+    """完整计算 T_world_body * T_body_base 后取平面位姿。"""
+    if not all(math.isfinite(v) for v in (*position, *quaternion)):
+        raise ValueError('non-finite odometry')
+    norm = math.sqrt(sum(v*v for v in quaternion))
+    if abs(norm-1.0) > 0.1:
+        raise ValueError('invalid orientation quaternion')
+    q = tuple(v/norm for v in quaternion)
+    offset = quaternion_product(quaternion_product(q, (*translation, 0.0)),
+                                (-q[0], -q[1], -q[2], q[3]))
+    cr, cp, cy = (math.cos(v/2) for v in rpy)
+    sr, sp, sy = (math.sin(v/2) for v in rpy)
+    rotation = (sr*cp*cy-cr*sp*sy, cr*sp*cy+sr*cp*sy,
+                cr*cp*sy-sr*sp*cy, cr*cp*cy+sr*sp*sy)
+    x, y, z, w = quaternion_product(q, rotation)
+    return (position[0]+offset[0], position[1]+offset[1],
+            math.atan2(2*(w*z+x*y), 1-2*(y*y+z*z)))
 
 
 class MotionNode(Node):
     def __init__(self):
         super().__init__('wheeltec_motion_controller')
         self.lock = threading.RLock()
-        self.active = None
-        self.reserved = False
-        self.closing = False
-        self.stop_pending = False
         self.done = threading.Event()
-        defaults = {f.name: getattr(Config(), f.name) for f in fields(Config)}
-        defaults.update(SETTINGS)
-        for key, value in defaults.items():
-            self.declare_parameter(key, value)
-        self.values = {key: self.get_parameter(key).value for key in defaults}
-        self.validate_values(self.values)
-        self.core = Controller(self.make_config(self.values))
-        self.navigation = NavigationController(self.core.config, self.values['navigation_frame'])
-        self.output = Command()
-        self.publisher = self.create_publisher(Twist, self.values['cmd_vel_topic'], 1)
+        self.p = {}
+        for name, default in DEFAULTS.items():
+            value = self.declare_parameter(
+                name, default, ParameterDescriptor(read_only=True)).value
+            if isinstance(default, float) and (not math.isfinite(value) or value <= 0):
+                raise ValueError(f'{name} must be finite and positive')
+            if isinstance(default, list) and (len(value) != 3 or
+                                               not all(math.isfinite(v) for v in value)):
+                raise ValueError(f'{name} must contain three finite numbers')
+            self.p[name] = value
+        if self.p['navigation_frame'] != 'base_link':
+            raise ValueError('navigation_frame must be base_link')
+        self.pose = None
+        self.pose_stamp = self.pose_received = None
+        self.pose_error = 'no pose received'
+        self.yaw_total = 0.0
+        self.mode, self.phase, self.reason = MotionStatus.IDLE, 'IDLE', 'ready'
+        self.active = self.goal = None
+        self.outcome = None
+        self.closing = False
+        self.session = self.enabled_stamp_ns = 0
+        self.request_stamp_ns = self.request_received = None
+        self.target = self.output = ZERO
+        self.remaining = self.cross_track = 0.0
+        self.last_tick = time.monotonic()
+        group = ReentrantCallbackGroup()
         qos = QoSProfile(depth=1, reliability=ReliabilityPolicy.BEST_EFFORT,
                          durability=DurabilityPolicy.VOLATILE)
-        self.subscription = self.create_subscription(
-            Odometry, self.values['odom_topic'], self.on_pose, qos,
-            callback_group=ReentrantCallbackGroup())
+        self.publisher = self.create_publisher(Twist, '/cmd_vel', 1)
+        self.odom_subscription = self.create_subscription(
+            Odometry, '/Odometry', self.on_pose, qos, callback_group=group)
         self.navigation_subscription = self.create_subscription(
-            TwistStamped, self.values['navigation_topic'], self.on_navigation, qos,
-            callback_group=ReentrantCallbackGroup())
-        status_qos = QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE,
-                               durability=DurabilityPolicy.TRANSIENT_LOCAL)
+            TwistStamped, '/wheeltec_motion/navigation/cmd_vel', self.on_navigation,
+            qos, callback_group=group)
         self.status_publisher = self.create_publisher(
-            MotionStatus, self.values['status_topic'], status_qos)
-        self.action_group = ReentrantCallbackGroup()
+            MotionStatus, '/wheeltec_motion/status',
+            QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE,
+                       durability=DurabilityPolicy.TRANSIENT_LOCAL))
         self.server = ActionServer(
-            self, ExecuteMotion, self.values['action_name'],
+            self, ExecuteMotion, '/wheeltec_motion/execute',
             execute_callback=self.execute, goal_callback=self.on_goal,
             cancel_callback=self.on_cancel, handle_accepted_callback=self.on_accepted,
-            callback_group=self.action_group)
+            callback_group=group)
         self.stop_service = self.create_service(
-            Trigger, self.values['stop_service'], self.on_stop,
-            callback_group=self.action_group)
-        self.navigation_service = self.create_service(
-            SetBool, self.values['navigation_mode_service'], self.on_navigation_mode,
-            callback_group=self.action_group)
-        self.timer = self.create_timer(1/self.core.config.control_rate_hz, self.tick,
-                                      callback_group=ReentrantCallbackGroup())
-        self.feedback_timer = self.create_timer(
-            1/self.core.config.feedback_rate_hz, self.feedback)
-        self.add_on_set_parameters_callback(self.on_parameters)
+            Trigger, '/wheeltec_motion/stop', self.on_stop, callback_group=group)
+        self.mode_service = self.create_service(
+            SetBool, '/wheeltec_motion/navigation/set_enabled', self.on_navigation_mode,
+            callback_group=group)
+        self.timer = self.create_timer(CONTROL_PERIOD, self.tick, callback_group=group)
+        self.feedback_timer = self.create_timer(FEEDBACK_PERIOD, self.feedback,
+                                                callback_group=group)
         self.publish_status()
-        self.get_logger().info(
-            f"Motion server ready; output enabled={self.values['control_enabled']}; "
-            f"extrinsics calibrated={self.values['extrinsics_calibrated']}. "
-            'No TF or serial port is owned by this node.')
+        self.get_logger().info('Motion ready; YAML parameters require restart.')
 
-    @staticmethod
-    def make_config(values):
-        return Config(**{f.name: values[f.name] for f in fields(Config)})
-
-    @classmethod
-    def validate_values(cls, values):
-        cls.make_config(values).validate()
-        for name in ('body_from_base_translation', 'body_from_base_rpy'):
-            value = values[name]
-            if len(value) != 3 or not all(math.isfinite(v) for v in value):
-                raise ValueError(f'{name} must contain three finite numbers')
-        for name in ('control_enabled', 'extrinsics_calibrated'):
-            if type(values[name]) is not bool:
-                raise ValueError(f'{name} must be bool')
-        for name in ('odom_topic', 'cmd_vel_topic', 'action_name', 'stop_service',
-                     'world_frame', 'body_frame', 'navigation_topic',
-                     'navigation_mode_service', 'status_topic', 'navigation_frame'):
-            if not isinstance(values[name], str) or not values[name].strip():
-                raise ValueError(f'{name} must be nonempty')
-
-    def on_parameters(self, params):
-        with self.lock:
-            try:
-                if self.reserved or self.navigation.enabled:
-                    raise ValueError('stop action/navigation before changing parameters')
-                updated = dict(self.values)
-                for p in params:
-                    if p.name in RESTART_ONLY:
-                        raise ValueError(f'{p.name} requires node restart')
-                    if p.name not in updated:
-                        raise ValueError(f'unknown controller parameter: {p.name}')
-                    updated[p.name] = p.value
-                self.validate_values(updated)
-                if self.values['control_enabled'] and not updated['control_enabled']:
-                    self.publish(Command())
-                self.values = updated
-                # Changing extrinsics/thresholds requires a fresh observation.
-                self.core = Controller(self.make_config(updated))
-                self.navigation = NavigationController(self.core.config, updated['navigation_frame'])
-                self.publish_status()
-                self.get_logger().info('Parameters updated; waiting for fresh pose.')
-                return SetParametersResult(successful=True)
-            except (ValueError, TypeError) as exc:
-                return SetParametersResult(successful=False, reason=str(exc))
+    def pose_ready(self, now, ros_now_ns):
+        return (self.pose is not None and not self.pose_error and
+                now-self.pose_received <= self.p['pose_timeout'] and
+                -FUTURE_TOLERANCE <= (ros_now_ns-self.pose_stamp)*1e-9 <= self.p['pose_timeout'])
 
     def on_pose(self, msg):
         with self.lock:
-            fault_sequence = self.core.fault_sequence
             try:
-                if msg.header.frame_id != self.values['world_frame']:
-                    raise ValueError('unexpected odometry world frame')
-                if msg.child_frame_id != self.values['body_frame']:
-                    raise ValueError('unexpected odometry child frame')
-                stamp = msg.header.stamp.sec + msg.header.stamp.nanosec*1e-9
-                age = self.get_clock().now().nanoseconds*1e-9-stamp
-                if age > self.core.config.pose_timeout:
-                    raise ValueError('odometry source timestamp is stale')
-                if age < -self.core.config.future_stamp_tolerance:
-                    raise ValueError('odometry source timestamp is in the future')
+                if msg.header.frame_id != 'camera_init' or msg.child_frame_id != 'body':
+                    raise ValueError('expected camera_init/body odometry')
+                if msg.header.stamp.sec < 0 or not 0 <= msg.header.stamp.nanosec < 10**9:
+                    raise ValueError('invalid odometry timestamp')
+                stamp = msg.header.stamp.sec*10**9+msg.header.stamp.nanosec
+                if self.pose_stamp is not None and stamp <= self.pose_stamp:
+                    raise ValueError('odometry timestamp did not advance')
                 p, q = msg.pose.pose.position, msg.pose.pose.orientation
-                pose = chassis_pose(
-                    (p.x, p.y, p.z), (q.x, q.y, q.z, q.w),
-                    self.values['body_from_base_translation'],
-                    self.values['body_from_base_rpy'])
-                self.core.observe(pose, stamp, time.monotonic())
-            except (ValueError, TypeError) as exc:
-                self.core.invalidate(str(exc))
-            if self.navigation.enabled and self.core.fault_sequence != fault_sequence:
-                self.navigation.disable(self.core.last_pose_fault)
-                self.publish(Command())
-                self.publish_status()
-            if self.active is not None and self.core.outcome is not None:
-                self.publish(Command())
-                self.done.set()
+                pose = chassis_pose((p.x, p.y, p.z), (q.x, q.y, q.z, q.w),
+                                    self.p['body_from_base_translation'],
+                                    self.p['body_from_base_rpy'])
+            except ValueError as exc:
+                self.pose_error = str(exc)
+                self.finish(ExecuteMotion.Result.POSE_INVALID, self.pose_error)
+                return
+            self.yaw_total += wrap(pose[2]-self.pose[2]) if self.pose is not None else pose[2]
+            self.pose, self.pose_stamp = pose, stamp
+            self.pose_received, self.pose_error = time.monotonic(), ''
 
-    def navigation_pose_ready(self, now, ros_now_ns):
-        if not self.core.ready(now) or self.core.valid_pose_samples < 2:
-            return False
-        age = ros_now_ns*1e-9-self.core.stamp
-        return -self.core.config.future_stamp_tolerance <= age <= self.core.config.pose_timeout
+    def publish(self, command):
+        self.output = command if self.p['control_enabled'] else ZERO
+        if self.p['control_enabled']:
+            msg = Twist()
+            msg.linear.x, msg.angular.z = self.output
+            self.publisher.publish(msg)
+
+    def finish(self, code, reason):
+        """结束当前任务；Action 保持占用至结果发出，避免新请求覆盖结果。"""
+        self.target = ZERO
+        self.request_stamp_ns = self.request_received = None
+        if self.mode == MotionStatus.ACTION:
+            if self.outcome is None:
+                self.outcome = (code, reason)
+                self.phase = 'SUCCEEDED' if code == ExecuteMotion.Result.SUCCEEDED else 'STOPPED'
+                self.reason = reason
+            self.done.set()
+        else:
+            self.mode, self.phase, self.reason = MotionStatus.IDLE, 'IDLE', reason
+        self.publish(ZERO)
+        self.publish_status()
 
     def on_navigation_mode(self, request, response):
         with self.lock:
-            try:
-                if self.reserved or self.closing:
-                    raise ValueError('action active or node shutting down')
-                if request.data:
-                    if not self.values['control_enabled'] or not self.values['extrinsics_calibrated']:
-                        raise ValueError('control and calibrated extrinsics must be enabled')
-                    now, ros_now = time.monotonic(), self.get_clock().now().nanoseconds
-                    if not self.navigation_pose_ready(now, ros_now):
-                        raise ValueError(self.core.pose_error or 'pose stale or awaiting consecutive samples')
-                    was_enabled = self.navigation.enabled
-                    self.navigation.enable(now, ros_now)
-                    if not was_enabled:
-                        self.publish(Command())
-                else:
-                    self.navigation.disable('navigation explicitly disabled')
-                    self.publish(Command())
-                response.success, response.message = True, self.navigation.reason
-            except (ValueError, TypeError) as exc:
-                response.success, response.message = False, str(exc)
-            self.publish_status()
+            now, ros_now = time.monotonic(), self.get_clock().now().nanoseconds
+            if self.mode == MotionStatus.ACTION or self.closing:
+                response.success, response.message = False, 'action active or shutting down'
+                return response
+            if not request.data:
+                self.finish(ExecuteMotion.Result.STOPPED, 'navigation disabled')
+            elif not (self.p['control_enabled'] and self.p['extrinsics_calibrated'] and
+                      self.pose_ready(now, ros_now)):
+                response.success, response.message = False, 'control disabled or pose unavailable'
+                return response
+            elif self.mode != MotionStatus.NAVIGATION:
+                self.mode, self.phase, self.reason = MotionStatus.NAVIGATION, 'WAITING', 'waiting for request'
+                self.session += 1
+                self.enabled_stamp_ns = ros_now
+                self.last_tick = now
+                self.publish(ZERO)
+                self.publish_status()
+            response.success, response.message = True, self.reason
             return response
 
     def on_navigation(self, msg):
         with self.lock:
-            if not self.navigation.enabled:
+            if self.mode != MotionStatus.NAVIGATION:
                 return
-            try:
-                stamp = msg.header.stamp
-                if stamp.sec < 0 or not 0 <= stamp.nanosec < 10**9:
-                    raise ValueError('invalid navigation source timestamp')
-                accepted = self.navigation.accept(
-                    (msg.twist.linear.x, msg.twist.linear.y, msg.twist.linear.z,
-                     msg.twist.angular.x, msg.twist.angular.y, msg.twist.angular.z),
-                    stamp.sec*10**9+stamp.nanosec, msg.header.frame_id,
-                    time.monotonic(), self.get_clock().now().nanoseconds)
-                if not self.navigation.enabled or (accepted and self.navigation.target == Command()):
-                    self.publish(Command())
-            except Exception as exc:
-                self.navigation.disable(f'navigation request exception: {exc}')
-                self.publish(Command())
+            stamp = msg.header.stamp.sec*10**9+msg.header.stamp.nanosec
+            if stamp <= (self.request_stamp_ns or self.enabled_stamp_ns):
+                return
+            t = msg.twist
+            values = (t.linear.x, t.linear.y, t.linear.z, t.angular.x, t.angular.y, t.angular.z)
+            age = (self.get_clock().now().nanoseconds-stamp)*1e-9
+            if (msg.header.stamp.sec < 0 or not 0 <= msg.header.stamp.nanosec < 10**9 or
+                    not all(math.isfinite(v) for v in values) or
+                    any(v != 0 for v in (t.linear.y, t.linear.z, t.angular.x, t.angular.y)) or
+                    msg.header.frame_id != self.p['navigation_frame'] or
+                    not -FUTURE_TOLERANCE <= age <= self.p['navigation_command_timeout']):
+                self.finish(ExecuteMotion.Result.STOPPED, 'invalid navigation request')
+                return
+            self.target = (clamp(t.linear.x, self.p['max_linear_speed']),
+                           clamp(t.angular.z, self.p['max_angular_speed']))
+            self.request_stamp_ns, self.request_received = stamp, time.monotonic()
+            self.phase, self.reason = 'RUNNING', 'navigation request accepted'
+            if self.target == ZERO:
+                self.phase = 'ZERO'
+                self.publish(ZERO)
             self.publish_status()
-
-    def publish_status(self):
-        msg = MotionStatus()
-        now, ros_now = time.monotonic(), self.get_clock().now()
-        msg.stamp = ros_now.to_msg()
-        msg.mode = (msg.NAVIGATION if self.navigation.enabled else
-                    msg.ACTION if self.reserved else msg.IDLE)
-        if self.reserved:
-            msg.phase = self.core.phase if self.active is not None else 'ACCEPTING'
-            msg.reason = (self.core.outcome.message if self.active is not None and self.core.outcome
-                          else 'relative action active')
-        else:
-            msg.phase, msg.reason = self.navigation.phase, self.navigation.reason
-        msg.control_enabled = self.values['control_enabled']
-        msg.extrinsics_calibrated = self.values['extrinsics_calibrated']
-        msg.pose_ready = self.navigation_pose_ready(now, ros_now.nanoseconds)
-        msg.navigation_session = self.navigation.session
-        msg.navigation_enabled_stamp_ns = self.navigation.enabled_stamp_ns
-        msg.navigation_request_age_sec = -1.0 if self.navigation.received is None else now-self.navigation.received
-        msg.requested_linear_x, msg.requested_angular_z = self.navigation.target.vx, self.navigation.target.wz
-        msg.output_linear_x, msg.output_linear_y, msg.output_angular_z = self.output.vx, self.output.vy, self.output.wz
-        self.status_publisher.publish(msg)
-
-    @staticmethod
-    def goal_from_request(request):
-        return Goal(request.motion_type, request.target, request.max_speed, request.timeout_sec)
 
     def on_goal(self, request):
         with self.lock:
-            try:
-                self.goal_from_request(request).validate(self.core.config)
-                if self.reserved or self.closing or self.navigation.enabled:
-                    raise ValueError('controller busy or shutting down')
-                if not self.values['control_enabled']:
-                    raise ValueError('control_enabled is false')
-                if not self.values['extrinsics_calibrated']:
-                    raise ValueError('extrinsics_calibrated is false')
-                if not self.core.ready(time.monotonic()):
-                    raise ValueError(self.core.pose_error or 'pose is stale')
-                self.reserved = True
-                self.stop_pending = False
-                self.done.clear()
-                self.publish_status()
-                return GoalResponse.ACCEPT
-            except (ValueError, TypeError) as exc:
-                self.get_logger().warning(f'Goal rejected: {exc}')
+            now, ros_now = time.monotonic(), self.get_clock().now().nanoseconds
+            valid = (request.motion_type in (request.MOVE_LINEAR, request.ROTATE) and
+                     all(math.isfinite(v) for v in (request.target, request.max_speed, request.timeout_sec)) and
+                     request.max_speed >= 0 and request.timeout_sec >= 0)
+            if (not valid or self.mode != MotionStatus.IDLE or self.closing or
+                    not self.p['control_enabled'] or not self.p['extrinsics_calibrated'] or
+                    not self.pose_ready(now, ros_now)):
+                self.get_logger().warning('Goal rejected: invalid request, busy, disabled or pose unavailable')
                 return GoalResponse.REJECT
+            self.mode, self.phase, self.reason = MotionStatus.ACTION, 'ACCEPTING', 'relative action accepted'
+            self.goal, self.origin, self.origin_yaw = request, self.pose, self.yaw_total
+            self.started = self.last_tick = now
+            self.remaining, self.cross_track = request.target, 0.0
+            self.outcome = None
+            self.done.clear()
+            self.publish_status()
+            return GoalResponse.ACCEPT
 
     def on_accepted(self, handle):
         with self.lock:
-            self.navigation.disable('relative action owns control')
             self.active = handle
-            try:
-                self.core.start(self.goal_from_request(handle.request), time.monotonic())
-                if self.stop_pending:
-                    self.core.finish(STOPPED, 'stop requested during goal acceptance')
-                    self.publish(Command())
-                    self.done.set()
-                self.get_logger().info(
-                    f'Goal started: type={handle.request.motion_type}, target={handle.request.target}')
-                self.publish_status()
-            except Exception as exc:
-                self.core.outcome = None
-                self.core.started = time.monotonic()
-                self.core.finish(INTERNAL_ERROR, str(exc))
-                self.publish(Command())
-                self.done.set()
+            if self.outcome is None:
+                self.phase = 'RUNNING'
+            self.publish_status()
         handle.execute()
 
     def on_cancel(self, handle):
         with self.lock:
-            if handle is self.active and self.core.outcome is None:
+            if handle is self.active and self.outcome is None:
                 return CancelResponse.ACCEPT
             return CancelResponse.REJECT
 
     def on_stop(self, request, response):
-        del request
         with self.lock:
-            self.navigation.disable('stop service requested')
-            if self.reserved:
-                self.stop_pending = True
-            if self.active is not None and self.core.outcome is None:
-                self.core.finish(STOPPED, 'stop service requested')
-                self.done.set()
-            self.publish(Command())
-            self.publish_status()
-            response.success = True
-            response.message = 'Stop requested; this response is not a physical stop measurement.'
-            self.get_logger().info(response.message)
+            self.finish(ExecuteMotion.Result.STOPPED, 'stop requested')
+            response.success, response.message = True, self.reason
             return response
-
-    def publish(self, command):
-        self.output = command if self.values['control_enabled'] else Command()
-        # Disabled means no messages, including idle zero messages.
-        if not self.values['control_enabled']:
-            return
-        msg = Twist()
-        msg.linear.x, msg.linear.y, msg.angular.z = command.vx, command.vy, command.wz
-        self.publisher.publish(msg)
 
     def tick(self):
         with self.lock:
-            try:
-                if self.active is not None and self.active.is_cancel_requested:
-                    self.core.finish(CANCELED, 'action canceled')
-                was_enabled = self.navigation.enabled
-                now, ros_now = time.monotonic(), self.get_clock().now().nanoseconds
-                if was_enabled:
-                    command = self.navigation.step(
-                        now, ros_now, self.navigation_pose_ready(now, ros_now),
-                        self.core.pose_error or 'navigation pose invalid or stale')
+            now, ros_now = time.monotonic(), self.get_clock().now().nanoseconds
+            dt, self.last_tick = now-self.last_tick, now
+            if self.mode == MotionStatus.IDLE or (self.mode == MotionStatus.ACTION and self.outcome is not None):
+                self.publish(ZERO)
+                return
+            if not self.pose_ready(now, ros_now):
+                self.finish(ExecuteMotion.Result.POSE_INVALID, self.pose_error or 'pose timeout')
+                return
+            p = self.p
+            if self.mode == MotionStatus.NAVIGATION:
+                if self.request_received is None:
+                    self.publish(ZERO)
+                    return
+                age = (ros_now-self.request_stamp_ns)*1e-9
+                if (now-self.request_received > p['navigation_command_timeout'] or
+                        not -FUTURE_TOLERANCE <= age <= p['navigation_command_timeout']):
+                    self.finish(ExecuteMotion.Result.TIMEOUT, 'navigation request timeout')
+                    return
+                desired = self.target
+            else:
+                if self.active is None:
+                    return
+                if self.active.is_cancel_requested:
+                    self.finish(ExecuteMotion.Result.CANCELED, 'action canceled')
+                    return
+                g = self.goal
+                if now-self.started >= (g.timeout_sec or p['default_timeout']):
+                    self.finish(ExecuteMotion.Result.TIMEOUT, 'action timeout')
+                    return
+                if g.motion_type == g.MOVE_LINEAR:
+                    dx, dy = self.pose[0]-self.origin[0], self.pose[1]-self.origin[1]
+                    cs, sn = math.cos(self.origin[2]), math.sin(self.origin[2])
+                    self.remaining = g.target-(cs*dx+sn*dy)
+                    self.cross_track = -sn*dx+cs*dy
+                    heading = wrap(self.origin[2]-self.pose[2])
+                    reached = abs(self.remaining) <= p['distance_tolerance'] and abs(heading) <= p['angle_tolerance']
+                    limit = min(g.max_speed or p['max_linear_speed'], p['max_linear_speed'])
+                    desired = (clamp(p['distance_gain']*self.remaining, limit),
+                               clamp(p['heading_gain']*heading, p['max_angular_speed']))
                 else:
-                    command = self.core.step(now) if self.active else Command()
-                self.publish(command)
-                if was_enabled and not self.navigation.enabled:
-                    self.publish_status()
-                if self.active is not None and self.core.outcome is not None:
-                    self.done.set()
-            except Exception as exc:
-                self.get_logger().error(f'Controller exception: {exc}')
-                self.navigation.disable(f'controller exception: {exc}')
-                self.core.finish(INTERNAL_ERROR, str(exc))
-                self.publish(Command())
-                self.done.set()
-                self.publish_status()
+                    self.remaining = g.target-(self.yaw_total-self.origin_yaw)
+                    reached = abs(self.remaining) <= p['angle_tolerance']
+                    limit = min(g.max_speed or p['max_angular_speed'], p['max_angular_speed'])
+                    desired = (0.0, clamp(p['rotation_gain']*self.remaining, limit))
+                if reached:
+                    self.finish(ExecuteMotion.Result.SUCCEEDED, 'target reached')
+                    return
+            vx, wz = self.output
+            self.publish((vx+clamp(desired[0]-vx, p['linear_accel']*dt),
+                          wz+clamp(desired[1]-wz, p['angular_accel']*dt)))
+
+    def publish_status(self):
+        msg = MotionStatus()
+        ros_now = self.get_clock().now()
+        msg.stamp = ros_now.to_msg()
+        msg.mode, msg.phase, msg.reason = self.mode, self.phase, self.reason
+        msg.control_enabled = self.p['control_enabled']
+        msg.extrinsics_calibrated = self.p['extrinsics_calibrated']
+        msg.pose_ready = self.pose_ready(time.monotonic(), ros_now.nanoseconds)
+        msg.navigation_session, msg.navigation_enabled_stamp_ns = self.session, self.enabled_stamp_ns
+        msg.navigation_request_age_sec = -1.0 if self.request_received is None else time.monotonic()-self.request_received
+        msg.requested_linear_x, msg.requested_angular_z = self.target
+        msg.output_linear_x, msg.output_angular_z = self.output
+        self.status_publisher.publish(msg)
 
     def feedback(self):
         with self.lock:
             self.publish_status()
-            if self.active is None or self.core.outcome is not None:
+            if self.active is None or self.outcome is not None:
                 return
             msg = ExecuteMotion.Feedback()
-            msg.phase = self.core.phase
-            p = self.core.pose
-            msg.current_x, msg.current_y, msg.current_yaw = p.x, p.y, p.yaw
-            msg.remaining, msg.cross_track_error = self.core.remaining, self.core.cross_track
-            msg.elapsed_sec = time.monotonic()-self.core.started
+            msg.phase = self.phase
+            msg.current_x, msg.current_y, msg.current_yaw = self.pose
+            msg.remaining, msg.cross_track_error = self.remaining, self.cross_track
+            msg.elapsed_sec = time.monotonic()-self.started
             self.active.publish_feedback(msg)
 
     def execute(self, handle):
-        # Executor has spare threads for pose updates, timers, stop and cancellation.
         while rclpy.ok() and not self.done.wait(0.05):
             pass
         with self.lock:
-            if self.core.outcome is None:
-                self.core.finish(STOPPED, 'node shutting down')
+            if self.outcome is None:
+                self.finish(ExecuteMotion.Result.STOPPED, 'node shutting down')
             result = ExecuteMotion.Result()
-            result.code, result.message = self.core.outcome.code, self.core.outcome.message
-            p = self.core.pose
-            if p is not None:
-                result.final_x, result.final_y, result.final_yaw = p.x, p.y, p.yaw
-            result.remaining = self.core.remaining
-            result.elapsed_sec = time.monotonic()-self.core.started
-            if handle.is_active:
-                if result.code == SUCCEEDED:
-                    handle.succeed()
-                elif result.code == CANCELED and handle.is_cancel_requested:
-                    handle.canceled()
-                else:
-                    handle.abort()
-            self.get_logger().info(f'Goal finished: code={result.code}, {result.message}')
-            self.active, self.reserved = None, False
-            self.core.goal = None
-            self.navigation.disable(f'relative action ended: {result.message}')
+            result.code, result.message = self.outcome
+            result.final_x, result.final_y, result.final_yaw = self.pose
+            result.remaining = self.remaining
+            result.elapsed_sec = time.monotonic()-self.started
+            if result.code == result.SUCCEEDED:
+                handle.succeed()
+            elif result.code == result.CANCELED:
+                handle.canceled()
+            else:
+                handle.abort()
+            self.active = self.goal = None
+            self.mode, self.phase = MotionStatus.IDLE, 'IDLE'
             self.publish_status()
             return result
 
     def close(self):
         with self.lock:
             self.closing = True
-            self.navigation.disable('node shutting down')
-            if self.active is not None:
-                self.core.finish(STOPPED, 'node shutting down')
-            self.done.set()
-            if self.context.ok():
-                self.publish(Command())
-                self.publish_status()
+            self.finish(ExecuteMotion.Result.STOPPED, 'node shutting down')
 
 
 def main(args=None):
@@ -416,8 +389,6 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
     finally:
-        # ros2 launch can forward SIGINT after the process group already received
-        # it. A second Ctrl-C must not interrupt zero output/resource cleanup.
         signal.signal(signal.SIGINT, signal.SIG_IGN)
         if node is not None:
             node.close()

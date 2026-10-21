@@ -73,7 +73,7 @@ def main(args=None):
             future = handle.cancel_goal_async()
             rclpy.spin_until_future_complete(node, future, timeout_sec=options.server_wait)
         exit_code = 130
-    except Exception as exc:
+    except (RuntimeError, ValueError) as exc:
         print(str(exc), file=sys.stderr)
     finally:
         node.destroy_node()

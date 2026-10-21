@@ -1,4 +1,4 @@
-"""Four GNOME Terminal tabs, with the existing dependency-aware recovery policy."""
+"""Configurable GNOME Terminal tabs, with the existing dependency-aware recovery policy."""
 import argparse
 import fcntl
 import json
@@ -15,7 +15,7 @@ import time
 import yaml
 from supervisor import ORDER, Processes, Supervisor, environment_setups, existing_nodes, load_config
 
-TITLES = {'base': '底盘通信', 'livox': 'Livox 雷达', 'fastlio': 'FAST-LIO 定位', 'motion': '自动控制接口'}
+TITLES = {'base': '底盘通信', 'livox': 'Livox 雷达', 'fastlio': 'FAST-LIO 定位', 'motion': '自动控制接口', 'camera': 'RGB-D 相机', 'rviz': 'RViz'}
 SCRIPT = str(Path(__file__).resolve())
 
 
@@ -29,22 +29,24 @@ def write_json(path, value):
 def read_json(path):
     try:
         return json.loads(Path(path).read_text())
-    except (OSError, ValueError):
+    except FileNotFoundError:
         return {}
 
 
 def alive(pid):
+    if pid is None:
+        return False
     try:
         os.kill(pid, 0)
         return True
-    except (OSError, TypeError):
+    except ProcessLookupError:
         return False
 
 
 def process_start(pid):
     try:
         return Path('/proc', str(pid), 'stat').read_text().rsplit(')', 1)[1].split()[19]
-    except (OSError, IndexError):
+    except (FileNotFoundError, ProcessLookupError):
         return None
 
 
@@ -68,9 +70,9 @@ def stop_orphan(state, config):
             time.sleep(0.1)
 
 
-def terminal_command(session, config_path):
+def terminal_command(session, config_path, order):
     argv = ['gnome-terminal', '--window']
-    for index, name in enumerate(ORDER):
+    for index, name in enumerate(order):
         if index:
             argv.append('--tab')
         command = [sys.executable, SCRIPT, '--worker', name, '--session', str(session), '--config', str(config_path)]
@@ -79,41 +81,13 @@ def terminal_command(session, config_path):
     return argv
 
 
-class VisibleProcesses(Processes):
-    """Each ROS launch lives under its terminal worker; tee output to its log."""
-    def start(self, name):
-        proc = subprocess.Popen(self.config['commands'][name], stdin=subprocess.DEVNULL,
-                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                start_new_session=True, bufsize=0)
-        self.children[name] = proc
-        output = (self.log_dir/(name+'.log')).open('ab', buffering=0)
-
-        def copy_output():
-            try:
-                while True:
-                    chunk = os.read(proc.stdout.fileno(), 4096)
-                    if not chunk:
-                        break
-                    output.write(chunk)
-                    try:
-                        sys.stdout.buffer.write(chunk)
-                        sys.stdout.buffer.flush()
-                    except (BrokenPipeError, OSError):
-                        # Closing the tab still runs process-group cleanup.
-                        pass
-            finally:
-                output.close()
-                proc.stdout.close()
-        threading.Thread(target=copy_output, daemon=True).start()
-        logging.info('START %s pid=%s argv=%s', name, proc.pid, self.config['commands'][name])
-
 
 def worker(name, session, config):
     state_path, command_path = session/(name+'.state.json'), session/(name+'.command.json')
     logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s',
                         handlers=[logging.StreamHandler(), logging.FileHandler(session/(name+'-tab.log'))])
     os.environ['ROS_LOG_DIR'] = str(session/'ros'/name)
-    processes = VisibleProcesses(config, session)
+    processes = Processes(config, session)
     stopping = False
     generation = 0
     phase = 'idle'
@@ -152,7 +126,7 @@ def worker(name, session, config):
                 logging.info('%s', notice)
                 status_message = notice
             write_json(state_path, {'pid': os.getpid(), 'generation': generation,
-                                    'phase': phase, 'heartbeat': time.time(),
+                                    'phase': phase,
                                     'launch_pid': processes.children[name].pid if name in processes.children else None,
                                     'launch_start': process_start(processes.children[name].pid) if name in processes.children else None})
             time.sleep(0.1)
@@ -168,7 +142,7 @@ class TerminalProcesses:
     """Supervisor process adapter: commands are executed in persistent tabs."""
     def __init__(self, config, session):
         self.config, self.session = config, Path(session)
-        self.children, self.generations = {}, {name: 0 for name in ORDER}
+        self.children, self.generations = {}, {name: 0 for name in config['order']}
 
     def command(self, name, op):
         write_json(self.session/(name+'.command.json'),
@@ -219,22 +193,17 @@ def validate(config):
 
 def manager(session, config, config_path):
     root = Path(config['log_root'])
-    lock_path = root/'supervisor.lock'  # Same lock as original script: never run both.
+    lock_path = root/'supervisor.lock'
     with lock_path.open('a+') as lock:
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as exc:
-            raise ValueError('已有总控在运行，请先停止旧版脚本，再试标签页版本。') from exc
+            raise ValueError('已有总控在运行，请先停止。') from exc
         if existing_nodes():
             raise ValueError('已有手动 ROS 节点，请先退出它们再启动标签页版本。')
         params = validate(config)
-        lock.seek(0)
-        lock.truncate()
-        lock.write(str(os.getpid()))
-        lock.flush()
         logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s',
                             handlers=[logging.FileHandler(session/'supervisor.log'), logging.StreamHandler()])
-        (session/'stack-config.yaml').write_text(yaml.safe_dump(config))
         (session/'motion-config.yaml').write_text(Path(config['motion_params']).read_text())
         write_json(root/'tabs-active.json', {'session': str(session), 'pid': os.getpid()})
         stopping = False
@@ -254,7 +223,7 @@ def manager(session, config, config_path):
         monitor = None
         runner = None
         try:
-            result = subprocess.run(terminal_command(session, config_path), capture_output=True, text=True, timeout=20)
+            result = subprocess.run(terminal_command(session, config_path, config['order']), capture_output=True, text=True, timeout=20)
             if result.returncode:
                 raise RuntimeError('无法打开 GNOME Terminal：'+result.stderr.strip())
             deadline = time.monotonic()+30
@@ -262,7 +231,7 @@ def manager(session, config, config_path):
                 if (session/'stop-request.json').exists():
                     stopping = True
                     break
-                if all(alive(read_json(session/(name+'.state.json')).get('pid')) for name in ORDER):
+                if all(alive(read_json(session/(name+'.state.json')).get('pid')) for name in config['order']):
                     break
                 time.sleep(0.1)
             else:
@@ -273,17 +242,17 @@ def manager(session, config, config_path):
             monitor = Health(config, params)
             runner = Supervisor(config, processes, monitor)
             write_json(session/'launch.json', {'ok': True, 'pid': os.getpid()})
-            logging.info('Four tabs opened. Ctrl+C in any tab stops the whole stack. Logs: %s', session)
+            logging.info('Tabs opened. Ctrl+C in any tab stops the whole stack. Logs: %s', session)
             next_tick = time.monotonic()
             while not stopping:
                 if (session/'stop-request.json').exists() or any(
-                        not alive(read_json(session/(name+'.state.json')).get('pid')) for name in ORDER):
+                        not alive(read_json(session/(name+'.state.json')).get('pid')) for name in config['order']):
                     break
                 monitor.spin(max(0, next_tick-time.monotonic()))
                 if time.monotonic() >= next_tick:
                     runner.tick()
-                    for name in ORDER:
-                        message = ('就绪，可以接收新的控制指令。' if name == 'motion' else '就绪。') if name in runner.ready else '等待启动条件或自动恢复；查看本标签页输出。'
+                    for name in config['order']:
+                        message = ('D455 图像流在线。' if name == 'camera' else '就绪，可以接收新的控制指令。' if name == 'motion' else '就绪。') if name in runner.ready else '等待启动条件或自动恢复；查看本标签页输出。'
                         write_json(session/(name+'.notice.json'), {'message': message})
                     next_tick = time.monotonic()+config['poll_sec']
         finally:
@@ -292,7 +261,7 @@ def manager(session, config, config_path):
                 if runner:
                     runner.shutdown()
             finally:
-                for name in reversed(ORDER):
+                for name in reversed(config['order']):
                     processes.command(name, 'quit')
                 if monitor:
                     monitor.close()
@@ -309,24 +278,40 @@ def active_manager(config):
         expected = SCRIPT.encode()
         if expected not in argv or b'--manager' not in argv or entry.get('session', '').encode() not in argv:
             return {}
-    except OSError:
+    except (FileNotFoundError, ProcessLookupError):
         return {}
     return entry
 
 
 def main():
-    parser = argparse.ArgumentParser(description='新增的四标签页版本；保留原 start_robot.sh。')
+    parser = argparse.ArgumentParser(description='统一标签页启动：底盘、雷达、定位、运动接口、相机；默认 D455，无 RViz。')
     parser.add_argument('--config', default=str(Path(__file__).with_name('config.yaml')))
+    parser.add_argument('--rviz', action=argparse.BooleanOptionalAction, default=None, help='开启/关闭 RViz，默认关闭')
     parser.add_argument('--check', action='store_true', help='只检查环境，不启动')
     parser.add_argument('--status', action='store_true', help='查看标签页版本是否运行与日志位置')
-    parser.add_argument('--stop', action='store_true', help='停止标签页版本及四个 ROS 组件')
+    parser.add_argument('--stop', action='store_true', help='停止标签页版本及所有受管组件')
     parser.add_argument('--print-setups', action='store_true', help=argparse.SUPPRESS)
     parser.add_argument('--manager', action='store_true', help=argparse.SUPPRESS)
-    parser.add_argument('--worker', choices=ORDER, help=argparse.SUPPRESS)
+    parser.add_argument('--worker', choices=tuple(TITLES), help=argparse.SUPPRESS)
     parser.add_argument('--session', help=argparse.SUPPRESS)
     args = parser.parse_args()
     config_path = str(Path(args.config).resolve())
+    if args.worker or args.manager:
+        config = yaml.safe_load(Path(config_path).read_text())
+        if args.worker:
+            worker(args.worker, Path(args.session), config)
+        else:
+            manager(Path(args.session), config, config_path)
+        return
     config = load_config(config_path)
+    if args.rviz is not None:
+        config['rviz'] = args.rviz
+    config['order'] = list(ORDER) + ['camera'] + (['rviz'] if config['rviz'] else [])
+    scripts = Path(config['workspaces']['motion'])/'scripts'
+    camera_script = 'start_d455.sh'
+    config['commands']['camera'] = ['bash', str(scripts/camera_script), '--start']
+    if config['rviz']:
+        config['commands']['rviz'] = ['bash', str(scripts/'start_debug_rviz.sh'), '--start']
     if args.stop or args.status:
         entry = active_manager(config)
         if not entry:
@@ -334,7 +319,7 @@ def main():
             return
         if args.stop:
             os.kill(entry['pid'], signal.SIGINT)
-            deadline = time.monotonic()+60
+            deadline = time.monotonic()+len(TITLES)*(config['shutdown_grace_sec']+config['shutdown_term_sec']+5)
             while alive(entry['pid']) and not Path(entry['session'], 'stopped.json').exists():
                 if time.monotonic() > deadline:
                     raise RuntimeError('停止仍在进行，请查看日志：'+entry['session'])
@@ -342,7 +327,8 @@ def main():
             print('已停止标签页版本。')
         else:
             print('总控 PID:', entry['pid'], '\n日志:', entry['session'])
-            for name in ORDER:
+            active_config = yaml.safe_load((Path(entry['session'])/'stack-config.yaml').read_text())
+            for name in active_config['order']:
                 print(TITLES[name]+':', read_json(Path(entry['session'])/(name+'.state.json')).get('phase', 'waiting'),
                       read_json(Path(entry['session'])/(name+'.notice.json')).get('message', ''))
         return
@@ -353,14 +339,12 @@ def main():
     if args.print_setups:
         sys.stdout.buffer.write(('\0'.join(setups)+'\0').encode())
         return
-    if args.worker:
-        worker(args.worker, Path(args.session), config)
-        return
-    if args.manager:
-        manager(Path(args.session), config, config_path)
-        return
-    validate(config)
     if args.check:
+        validate(config)
+        camera_check = config['commands']['camera'][:-1] + ['--check']
+        subprocess.run(camera_check, check=True)
+        if config['rviz']:
+            subprocess.run([v if v != '--start' else '--check' for v in config['commands']['rviz']], check=True)
         print('CHECK PASSED. 当前已有节点：', existing_nodes())
         return
     if not os.environ.get('DISPLAY') and not os.environ.get('WAYLAND_DISPLAY'):
@@ -372,6 +356,8 @@ def main():
     root.mkdir(parents=True, exist_ok=True)
     session = root/(time.strftime('%Y%m%d-%H%M%S')+'-tabs-'+str(os.getpid()))
     session.mkdir()
+    config_path = str(session/'stack-config.yaml')
+    Path(config_path).write_text(yaml.safe_dump(config))
     with (session/'bootstrap.log').open('ab', buffering=0) as output:
         proc = subprocess.Popen([sys.executable, SCRIPT, '--manager', '--session', str(session), '--config', config_path],
                                 start_new_session=True, stdin=subprocess.DEVNULL, stdout=output, stderr=subprocess.STDOUT)
@@ -381,7 +367,7 @@ def main():
             if proc.poll() is not None:
                 raise RuntimeError((session/'bootstrap.log').read_text().strip())
             if read_json(session/'launch.json').get('ok'):
-                print('已打开四个标签页；等待“自动控制接口”标签显示就绪。\n日志：'+str(session))
+                print(f'已打开 {len(config["order"])} 个标签页；等待“自动控制接口”标签显示就绪。\n日志：'+str(session))
                 return
             time.sleep(0.1)
         raise RuntimeError('打开标签页超时；日志：'+str(session))
@@ -392,8 +378,4 @@ def main():
 
 
 if __name__ == '__main__':
-    try:
-        main()
-    except Exception as exc:
-        print('robot tabs failed: '+str(exc), file=sys.stderr)
-        raise SystemExit(1)
+    main()

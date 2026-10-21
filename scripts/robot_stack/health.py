@@ -1,4 +1,5 @@
 """Passive ROS readiness checks; no Twist publisher and no action goals."""
+import logging
 import math
 import struct
 import time
@@ -9,7 +10,7 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
 from rclpy.signals import SignalHandlerOptions
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
-from sensor_msgs.msg import Imu
+from sensor_msgs.msg import Imu, Image, CameraInfo
 from std_msgs.msg import Float32
 from livox_ros_driver2.msg import CustomMsg
 from wheeltec_motion_interfaces.action import ExecuteMotion
@@ -19,7 +20,7 @@ class Health:
     def __init__(self, config, params):
         self.config, self.params = config, params
         rclpy.init(signal_handler_options=SignalHandlerOptions.NO)
-        self.node = rclpy.create_node('wheeltec_stack_monitor')
+        self.node = rclpy.create_node('conavbot_stack_monitor')
         self.received, self.errors = {}, {}
         self.odom_stamp, self.odom_good = None, 0
         qos = QoSProfile(depth=1, reliability=ReliabilityPolicy.BEST_EFFORT,
@@ -31,7 +32,25 @@ class Health:
             self.node.create_subscription(Odometry, params.get('odom_topic', '/Odometry'), self.odom, qos),
             self.node.create_subscription(Twist, params.get('cmd_vel_topic', '/cmd_vel'),
                                           lambda msg: self.record('motion'), qos)]
+        if 'camera' in config.get('order', ()):
+            prefix = '/camera/d455/raw/d455/'
+            for name, topic, kind in (
+                    ('color', 'color/image_raw', Image),
+                    ('depth', 'aligned_depth_to_color/image_raw', Image),
+                    ('color_info', 'color/camera_info', CameraInfo),
+                    ('depth_info', 'aligned_depth_to_color/camera_info', CameraInfo)):
+                if kind is Image:
+                    self.subscriptions.append(self.node.create_subscription(
+                        kind, prefix+topic, lambda data, key=name: self.raw(key, data), qos, raw=True))
+                else:
+                    self.subscriptions.append(self.node.create_subscription(
+                        kind, prefix+topic, lambda msg, key=name: self.camera(key, msg), qos))
         self.action = ActionClient(self.node, ExecuteMotion, params.get('action_name', '/wheeltec_motion/execute'))
+
+    def camera(self, key, msg):
+        stamp = msg.header.stamp.sec + msg.header.stamp.nanosec*1e-9
+        if self.check_stamp(key, stamp):
+            self.record(key)
 
     def record(self, name):
         self.received[name] = time.monotonic()
@@ -84,7 +103,8 @@ class Health:
         self.record('fastlio')
 
     def reset(self, name):
-        keys = ('imu', 'lidar') if name == 'livox' else (name,)
+        keys = (('imu', 'lidar') if name == 'livox' else
+                ('color', 'depth', 'color_info', 'depth_info') if name == 'camera' else (name,))
         for key in keys:
             self.received.pop(key, None)
             self.errors.pop(key, None)
@@ -100,6 +120,8 @@ class Health:
         return True, ''
 
     def healthy(self, name):
+        if name == 'rviz':
+            return True, ''  # Supervisor separately checks process liveness.
         timeout = self.config['health_timeout_sec']
         if name == 'livox':
             imu = self.stream('imu', timeout)
@@ -110,6 +132,12 @@ class Health:
                 return fresh
             if self.odom_good < self.config['odom_ready_samples']:
                 return False, 'waiting for consecutive valid odometry samples'
+            return True, ''
+        if name == 'camera':
+            for key in ('color', 'depth', 'color_info', 'depth_info'):
+                state = self.stream(key, timeout)
+                if not state[0]:
+                    return state
             return True, ''
         if name == 'motion':
             if not self.action.server_is_ready():

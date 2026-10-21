@@ -34,7 +34,7 @@ Visualization Manager:
       Draw Behind: true
       Use Timestamp: false
       Topic:
-        Value: /wheeltec_exploration/map
+        Value: /conavbot/map
         Depth: 1
         History Policy: Keep Last
         Reliability Policy: Reliable
@@ -50,7 +50,7 @@ Visualization Manager:
       Head Radius: 0.08
       Color: 50; 255; 80
       Topic:
-        Value: /wheeltec_exploration/goal
+        Value: /conavbot/goal
         Depth: 1
         History Policy: Keep Last
         Reliability Policy: Reliable
@@ -66,7 +66,7 @@ Visualization Manager:
       Head Length: 0.08
       Head Radius: 0.06
       Topic:
-        Value: /wheeltec_exploration/short_term_goal
+        Value: /conavbot/short_term_goal
         Depth: 1
         History Policy: Keep Last
         Reliability Policy: Reliable
@@ -76,7 +76,7 @@ Visualization Manager:
       Enabled: true
       Namespaces: {}
       Topic:
-        Value: /wheeltec_exploration/debug_markers
+        Value: /conavbot/debug_markers
         Depth: 1
         History Policy: Keep Last
         Reliability Policy: Reliable
@@ -88,7 +88,7 @@ Visualization Manager:
       Color Scheme: map
       Draw Behind: true
       Topic:
-        Value: /wheeltec_exploration/explored_map
+        Value: /conavbot/explored_map
         Depth: 1
         Reliability Policy: Reliable
         Durability Policy: Volatile
@@ -99,7 +99,7 @@ Visualization Manager:
       Color Scheme: map
       Draw Behind: true
       Topic:
-        Value: /wheeltec_exploration/obstacle_map
+        Value: /conavbot/obstacle_map
         Depth: 1
         Reliability Policy: Reliable
         Durability Policy: Volatile
@@ -166,7 +166,7 @@ Visualization Manager:
       Normalize Range: true
       Transport Hint: raw
       Topic:
-        Value: /wheeltec_camera/raw/color/image_raw
+        Value: /camera/d455/raw/d455/color/image_raw
         Depth: 1
         History Policy: Keep Last
         Reliability Policy: Best Effort
@@ -176,11 +176,11 @@ Visualization Manager:
       Enabled: true
       Normalize Range: false
       Min Value: 400
-      Max Value: 2000
+      Max Value: 6000
       Median window: 5
       Transport Hint: raw
       Topic:
-        Value: /wheeltec_camera/raw/depth/image_raw
+        Value: /camera/d455/raw/d455/aligned_depth_to_color/image_raw
         Depth: 1
         History Policy: Keep Last
         Reliability Policy: Best Effort

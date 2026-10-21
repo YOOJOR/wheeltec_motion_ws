@@ -12,11 +12,12 @@ from rclpy.node import Node
 from geometry_msgs.msg import Twist,TwistStamped
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import Image
-from wheeltec_rgbd_interfaces.msg import RGBDFrame
 from std_msgs.msg import String
 from wheeltec_motion_interfaces.msg import MotionStatus
-from wheeltec_rgbd.posed import transform
-from wheeltec_rgbd.node import latest_qos
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]/'conavgpt2_ws/development/Co-NavGPT2'))
+from conavbot.geometry import transform
+from conavbot.perception import latest_qos
 import yaml
 
 
@@ -24,7 +25,7 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--duration',type=float,default=60.)
     p.add_argument('--output',type=Path,required=True)
-    p.add_argument('--sensor-timing',action='store_true',help='Also observe Astra raw image and RGB-D header arrival times; never store image pixels')
+    p.add_argument('--sensor-timing',action='store_true',help='Also observe D455 color/depth header arrival times; never store image pixels')
     args=p.parse_args()
     if not math.isfinite(args.duration) or not 0<args.duration<=120:p.error('duration must be (0,120]')
     args.output.parent.mkdir(parents=True,exist_ok=True)
@@ -37,15 +38,10 @@ def main():
         stamp=lambda h:h.stamp.sec*10**9+h.stamp.nanosec
         row={'kind':kind,'received_ros_ns':now,'received_monotonic':time.monotonic(),
              'source_stamp_ns':stamp(msg.header),'header_age_sec':(now-stamp(msg.header))/1e9}
-        if kind=='rgbd':
-            row.update(color_stamp_ns=stamp(msg.color.header),depth_stamp_ns=stamp(msg.depth.header),
-                       sequence=msg.sequence,pairing_delta_sec=msg.pairing_delta_sec,
-                       oldest_image_age_sec=(now-min(stamp(msg.color.header),stamp(msg.depth.header)))/1e9)
         sensor_timing.append(row)
     if args.sensor_timing:
-        node.create_subscription(Image,'/wheeltec_camera/raw/color/image_raw',lambda m:sensor('raw_color',m),latest_qos())
-        node.create_subscription(Image,'/wheeltec_camera/raw/depth/image_raw',lambda m:sensor('raw_depth',m),latest_qos())
-        node.create_subscription(RGBDFrame,'/wheeltec_camera/rgbd',lambda m:sensor('rgbd',m),latest_qos())
+        node.create_subscription(Image,'/camera/d455/raw/d455/color/image_raw',lambda m:sensor('raw_color',m),latest_qos())
+        node.create_subscription(Image,'/camera/d455/raw/d455/aligned_depth_to_color/image_raw',lambda m:sensor('raw_depth',m),latest_qos())
     def odometry(m):
         xyz,q=m.pose.pose.position,m.pose.pose.orientation
         matrix=transform([xyz.x,xyz.y,xyz.z],[q.x,q.y,q.z,q.w])
@@ -54,7 +50,7 @@ def main():
         poses.append((time.monotonic(),base.tolist(),math.atan2(matrix[1,0],matrix[0,0]),(node.get_clock().now().nanoseconds-stamp)/1e9))
     node.create_subscription(Twist,'/cmd_vel',lambda m:commands.append((time.monotonic(),m.linear.x,m.angular.z)),1)
     node.create_subscription(Odometry,'/Odometry',odometry,latest_qos())
-    node.create_subscription(String,'/wheeltec_conav/decision',lambda m:decisions.append(json.loads(m.data)),1)
+    node.create_subscription(String,'/conavbot/decision',lambda m:decisions.append(json.loads(m.data)),1)
     node.create_subscription(MotionStatus,'/wheeltec_motion/status',lambda m:states.append({'mode':m.mode,'phase':m.phase,'reason':m.reason,'request_age_sec':m.navigation_request_age_sec}),1)
     def navigation(m):
         stamp=m.header.stamp.sec*10**9+m.header.stamp.nanosec
@@ -91,7 +87,7 @@ def main():
             'sensor_timing_enabled':args.sensor_timing,
             'sensor_timing':{kind:{'count':len(rows),'header_age_max_sec':max(r['header_age_sec'] for r in rows),
                 'header_age_p95_sec':float(np.percentile([r['header_age_sec'] for r in rows],95))}
-                for kind in ('raw_color','raw_depth','rgbd') if (rows:=[r for r in sensor_timing if r['kind']==kind])}}
+                for kind in ('raw_color','raw_depth') if (rows:=[r for r in sensor_timing if r['kind']==kind])}}
         args.output.write_text(json.dumps(result,indent=2)+'\n')
         args.output.with_suffix('.samples.json').write_text(json.dumps({'commands':commands,'poses':poses,'decisions':decisions,'states':states,'requests':requests,'sensor_timing':sensor_timing})+'\n')
         print(json.dumps(result,indent=2))

@@ -17,7 +17,7 @@ from livox_ros_driver2.msg import CustomMsg
 from rclpy.serialization import deserialize_message
 
 rclpy.init()
-node = rclpy.create_node('wheeltec_delay_probe')
+node = rclpy.create_node('conavbot_delay_probe')
 qos = QoSProfile(depth=1, reliability=ReliabilityPolicy.BEST_EFFORT,
                  durability=DurabilityPolicy.VOLATILE)
 window = {name: [] for name in ('imu', 'lidar', 'odom')}

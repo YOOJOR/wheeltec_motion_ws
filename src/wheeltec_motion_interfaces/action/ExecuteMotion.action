@@ -3,7 +3,8 @@ uint8 MOVE_LINEAR=1
 uint8 ROTATE=2
 uint8 motion_type
 float64 target
-# Zero uses the configured default. Positive overrides may only reduce limits.
+# Zero uses the configured default. Requested speed is clamped to the vehicle limit.
+# A positive timeout overrides the default without an additional maximum.
 float64 max_speed
 float64 timeout_sec
 ---

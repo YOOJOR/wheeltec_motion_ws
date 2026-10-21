@@ -26,8 +26,8 @@ class ServiceUnavailable(RuntimeError):
 
 def decision_velocity(decision, forward_speed=.12, turn_speed=.30):
     if (not all(math.isfinite(v) for v in (forward_speed, turn_speed)) or
-            not 0 < forward_speed <= .15 or not 0 < turn_speed <= .35):
-        raise ValueError('adapter speeds must fit this vehicle: <=0.15 m/s, <=0.35 rad/s')
+            forward_speed <= 0 or turn_speed <= 0):
+        raise ValueError('adapter speeds must be finite and positive')
     mapping = {'forward': (forward_speed, 0.), 'left': (0., turn_speed),
                'right': (0., -turn_speed), 'reverse': (-forward_speed, 0.)}
     if decision not in mapping:
@@ -94,32 +94,20 @@ class NavigationClient(Node):
         req = SetBool.Request()
         req.data = True
         started_ns = self.get_clock().now().nanoseconds
-        try:
-            result = self.call(self.mode_client, req, timeout)
-            deadline = time.monotonic()+timeout
-            while time.monotonic() < deadline:
-                rclpy.spin_once(self, timeout_sec=.02)
-                s = self.status
-                if (self.fresh_status() and s.mode == s.NAVIGATION and
-                        s.stamp.sec*10**9+s.stamp.nanosec >= started_ns):
-                    session = (s.navigation_session, s.navigation_enabled_stamp_ns)
-                    if session != self.session:
-                        self.last_decision_stamp_ns = s.navigation_enabled_stamp_ns
-                    self.session = session
-                    return result
-            raise RuntimeError('fresh navigation status unavailable after enable')
-        except (ServiceRejected, ServiceUnavailable):
-            self.session = None
-            raise
-        except Exception:
-            self.session = None
-            # An enable response may have been lost after the server accepted it.
-            # Best effort explicit stop; even if unavailable, no velocities follow.
-            try:
-                self.stop(timeout=.3)
-            except RuntimeError:
-                pass
-            raise
+        previous_session = self.session
+        self.session = None
+        result = self.call(self.mode_client, req, timeout)
+        deadline = time.monotonic()+timeout
+        while time.monotonic() < deadline:
+            rclpy.spin_once(self, timeout_sec=.02)
+            s = self.status
+            if (self.fresh_status() and s.mode == s.NAVIGATION and
+                    s.stamp.sec*10**9+s.stamp.nanosec >= started_ns):
+                self.session = (s.navigation_session, s.navigation_enabled_stamp_ns)
+                if self.session != previous_session:
+                    self.last_decision_stamp_ns = s.navigation_enabled_stamp_ns
+                return result
+        raise RuntimeError('fresh navigation status unavailable after enable')
 
     def disable(self, timeout=2.):
         self.session = None

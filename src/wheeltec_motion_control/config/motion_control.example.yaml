@@ -1,52 +1,28 @@
 wheeltec_motion_controller:
   ros__parameters:
-    # 新车模板：不发布速度，零偏移只是占位值。测量、填写并确认后才能启用。
-    control_enabled: false
-    extrinsics_calibrated: false
-    odom_topic: /Odometry
-    cmd_vel_topic: /cmd_vel
-    action_name: /wheeltec_motion/execute
-    stop_service: /wheeltec_motion/stop
-    navigation_topic: /wheeltec_motion/navigation/cmd_vel
-    navigation_mode_service: /wheeltec_motion/navigation/set_enabled
-    status_topic: /wheeltec_motion/status
-    navigation_frame: base_link # 底盘控制参考点标签；不代表已发布 TF
-    world_frame: camera_init
-    body_frame: body
-    # T_body_base: 底盘参考点在 IMU/body 中的位置(m)，及底盘轴转到 body 轴的 RPY(rad)。
-    # 按新车实际旋转中心和 IMU 安装重新测量；不要直接沿用第一台车的值。
-    body_from_base_translation: [0.0, 0.0, 0.0]
-    body_from_base_rpy: [0.0, 0.0, 0.0]
+    # 修改后重启节点；频率固定为控制 20 Hz、反馈 5 Hz。
 
-    control_rate_hz: 20.0
-    feedback_rate_hz: 5.0
-    max_linear_speed: 0.15          # m/s；x 轴
-    max_lateral_speed: 0.05         # m/s；y 轴，启用横移纠偏才使用
-    max_angular_speed: 0.35         # rad/s
-    linear_accel: 0.15             # m/s²，各平移轴；主动停止直接发布零速度
-    angular_accel: 0.5             # rad/s²
-    distance_gain: 0.8             # 1/s
-    heading_gain: 1.5              # 1/s
-    lateral_gain: 0.6              # 1/s
-    rotation_gain: 1.2             # 1/s
-    lateral_correction: false      # 基本直行通过后再启用麦轮横向纠偏
-    distance_tolerance: 0.03       # m
-    cross_track_tolerance: 0.05    # m
-    angle_tolerance: 0.035         # rad，约 2 度
-    settle_time: 0.4               # s，需要持续收到新的合格位姿
-    stopped_linear_speed: 0.025    # m/s，用相邻位姿估计，仅为静止判据
-    stopped_angular_speed: 0.04    # rad/s
-    navigation_command_timeout: 0.3 # s，导航请求接收/源时间双重有效期
-    navigation_future_stamp_tolerance: 0.1 # s，导航源时间允许超前量
-    pose_timeout: 0.5              # s，位姿过期判断，非物理停车时限
-    future_stamp_tolerance: 0.1    # s，实车多机时钟需同步
-    max_position_jump: 0.5        # m，相邻底盘位姿允许最大位移
-    max_yaw_jump: 0.8             # rad，相邻姿态允许最大变化，必须小于 pi
-    default_timeout: 45.0          # s，单个动作
-    max_timeout: 180.0             # s，允许单动作请求覆盖到的最大超时
-    no_progress_timeout: 5.0      # s，无可测进展则结束动作
-    linear_progress_epsilon: 0.005 # m
-    angular_progress_epsilon: 0.01 # rad
-    max_distance: 5.0              # m，单动作绝对距离上限
-    max_rotation: 6.283185307179586 # rad，单动作绝对转角上限
-    max_control_gap: 0.3           # s，控制调度间隔超限则结束动作
+    # 启用与安装：T_body_base；base_link 为厂家四轮几何中心。
+    control_enabled: false # false 时不发布速度
+    extrinsics_calibrated: false # 填写并确认本车外参后启用
+    navigation_frame: base_link # 底盘控制参考点
+    body_from_base_translation: [0.0, 0.0, 0.0] # m；第一台车 XY 为暂用安装估计，新车须重新测量
+    body_from_base_rpy: [0.0, 0.0, 0.0] # rad
+
+    # 速度与加速度
+    max_linear_speed: 0.15 # m/s
+    max_angular_speed: 0.35 # rad/s
+    linear_accel: 0.15 # m/s²
+    angular_accel: 0.5 # rad/s²；stop 直接归零
+
+    # 直行与旋转：进入容差即结束；不做静止确认。
+    distance_gain: 0.8 # 1/s
+    heading_gain: 1.5 # 1/s
+    rotation_gain: 1.2 # 1/s
+    distance_tolerance: 0.03 # m
+    angle_tolerance: 0.035 # rad
+
+    # 超时：源时间超前容许量固定为 0.1 s。
+    navigation_command_timeout: 0.3 # s；导航源时间和接收时间有效期
+    pose_timeout: 0.5 # s；位姿源时间和接收时间有效期
+    default_timeout: 45.0 # s；动作请求可覆盖

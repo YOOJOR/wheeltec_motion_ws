@@ -1,3 +1,5 @@
+# 默认统一标签页：D455 相机；通过 --rviz 覆盖。
+rviz: false
 # ROS 2 Humble。路径中的 ~ 按当前用户展开；不要通过 alias 启动。
 ros_setup: /opt/ros/humble/setup.bash
 workspaces:
