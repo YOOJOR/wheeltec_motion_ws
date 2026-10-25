@@ -127,6 +127,22 @@ Visualization Manager:
         Durability Policy: Volatile
         Filter size: 5
     - Class: rviz_default_plugins/Path
+      Name: Agent navigation path
+      Enabled: true
+      Buffer Length: 1
+      Color: 40; 255; 80
+      Alpha: 0.8
+      Line Style: Lines
+      Line Width: 0.025
+      Pose Style: None
+      Topic:
+        Value: /conavbot/path
+        Depth: 1
+        History Policy: Keep Last
+        Reliability Policy: Best Effort
+        Durability Policy: Volatile
+        Filter size: 5
+    - Class: rviz_default_plugins/Path
       Name: FAST-LIO IMU path
       Enabled: true
       Buffer Length: 1

@@ -19,6 +19,7 @@ wheeltec_motion_controller:
     distance_gain: 1.2 # 1/s
     heading_gain: 1.5 # 1/s
     rotation_gain: 1.6 # 1/s
+    path_lookahead: 0.25 # m；路径跟踪前视距离
     distance_tolerance: 0.03 # m
     angle_tolerance: 0.035 # rad
 

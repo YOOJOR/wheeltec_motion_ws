@@ -12,11 +12,11 @@ from rclpy.node import Node
 from rclpy.signals import SignalHandlerOptions
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
 from rcl_interfaces.msg import ParameterDescriptor
-from geometry_msgs.msg import Twist, TwistStamped
+from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 from std_srvs.srv import Trigger, SetBool
 from wheeltec_motion_interfaces.action import ExecuteMotion
-from wheeltec_motion_interfaces.msg import MotionStatus
+from wheeltec_motion_interfaces.msg import MotionStatus, NavigationPath
 
 CONTROL_PERIOD, FEEDBACK_PERIOD, FUTURE_TOLERANCE = 0.05, 0.2, 0.1
 ZERO = (0.0, 0.0)
@@ -33,6 +33,7 @@ DEFAULTS = {
     'distance_gain': 0.8,
     'heading_gain': 1.5,
     'rotation_gain': 1.2,
+    'path_lookahead': 0.25,
     'distance_tolerance': 0.03,
     'angle_tolerance': 0.035,
     'pose_timeout': 0.5,
@@ -102,6 +103,8 @@ class MotionNode(Node):
         self.closing = False
         self.session = self.enabled_stamp_ns = 0
         self.request_stamp_ns = self.request_received = None
+        self.path = []
+        self.path_limits = ZERO
         self.target = self.output = ZERO
         self.remaining = self.cross_track = 0.0
         self.last_tick = time.monotonic()
@@ -112,7 +115,7 @@ class MotionNode(Node):
         self.odom_subscription = self.create_subscription(
             Odometry, '/Odometry', self.on_pose, qos, callback_group=group)
         self.navigation_subscription = self.create_subscription(
-            TwistStamped, '/wheeltec_motion/navigation/cmd_vel', self.on_navigation,
+            NavigationPath, '/wheeltec_motion/navigation/path', self.on_navigation,
             qos, callback_group=group)
         self.status_publisher = self.create_publisher(
             MotionStatus, '/wheeltec_motion/status',
@@ -170,6 +173,7 @@ class MotionNode(Node):
 
     def finish(self, code, reason):
         """结束当前任务；Action 保持占用至结果发出，避免新请求覆盖结果。"""
+        self.path = []
         self.target = ZERO
         self.request_stamp_ns = self.request_received = None
         if self.mode == MotionStatus.ACTION:
@@ -196,7 +200,7 @@ class MotionNode(Node):
                 response.success, response.message = False, 'control disabled or pose unavailable'
                 return response
             elif self.mode != MotionStatus.NAVIGATION:
-                self.mode, self.phase, self.reason = MotionStatus.NAVIGATION, 'WAITING', 'waiting for request'
+                self.mode, self.phase, self.reason = MotionStatus.NAVIGATION, 'WAITING_PATH', 'waiting for path'
                 self.session += 1
                 self.enabled_stamp_ns = ros_now
                 self.last_tick = now
@@ -209,27 +213,69 @@ class MotionNode(Node):
         with self.lock:
             if self.mode != MotionStatus.NAVIGATION:
                 return
-            stamp = msg.header.stamp.sec*10**9+msg.header.stamp.nanosec
+            header = msg.path.header
+            stamp = header.stamp.sec*10**9+header.stamp.nanosec
             if stamp <= (self.request_stamp_ns or self.enabled_stamp_ns):
                 return
-            t = msg.twist
-            values = (t.linear.x, t.linear.y, t.linear.z, t.angular.x, t.angular.y, t.angular.z)
             age = (self.get_clock().now().nanoseconds-stamp)*1e-9
-            if (msg.header.stamp.sec < 0 or not 0 <= msg.header.stamp.nanosec < 10**9 or
-                    not all(math.isfinite(v) for v in values) or
-                    any(v != 0 for v in (t.linear.y, t.linear.z, t.angular.x, t.angular.y)) or
-                    msg.header.frame_id != self.p['navigation_frame'] or
-                    not -FUTURE_TOLERANCE <= age <= self.p['navigation_command_timeout']):
-                self.finish(ExecuteMotion.Result.STOPPED, 'invalid navigation request')
+            limits = (msg.max_linear_speed, msg.max_angular_speed)
+            points = [(pose.pose.position.x, pose.pose.position.y) for pose in msg.path.poses]
+            if (header.stamp.sec < 0 or not 0 <= header.stamp.nanosec < 10**9 or
+                    header.frame_id != 'camera_init' or
+                    not -FUTURE_TOLERANCE <= age <= self.p['navigation_command_timeout'] or
+                    not all(math.isfinite(v) and v > 0 for v in limits) or
+                    any(pose.header.frame_id != 'camera_init' or
+                        not all(math.isfinite(v) for v in (pose.pose.position.x,
+                            pose.pose.position.y, pose.pose.position.z)) for pose in msg.path.poses)):
+                self.finish(ExecuteMotion.Result.STOPPED, 'invalid navigation path')
                 return
-            self.target = (clamp(t.linear.x, self.p['max_linear_speed']),
-                           clamp(t.angular.z, self.p['max_angular_speed']))
+            self.path = []
+            for point in points:
+                if not self.path or point != self.path[-1]:
+                    self.path.append(point)
+            self.path_limits = (min(limits[0], self.p['max_linear_speed']),
+                                min(limits[1], self.p['max_angular_speed']))
             self.request_stamp_ns, self.request_received = stamp, time.monotonic()
-            self.phase, self.reason = 'RUNNING', 'navigation request accepted'
-            if self.target == ZERO:
-                self.phase = 'ZERO'
+            self.phase, self.reason = 'TRACKING', 'new path accepted'
+            if not self.path:
+                self.target = ZERO
+                self.phase, self.reason = 'WAITING_PATH', 'empty path'
                 self.publish(ZERO)
             self.publish_status()
+
+    def follow_path(self):
+        """Project onto the polyline, then track a point ahead in arc length."""
+        x, y, yaw = self.pose
+        end_distance = math.hypot(self.path[-1][0]-x, self.path[-1][1]-y)
+        if end_distance <= self.p['distance_tolerance']:
+            self.phase, self.reason = 'REACHED', 'path endpoint reached'
+            return ZERO
+        nearest, segment, fraction = math.inf, 0, 0.0
+        for i, (a, b) in enumerate(zip(self.path, self.path[1:])):
+            dx, dy = b[0]-a[0], b[1]-a[1]
+            t = max(0.0, min(1.0, ((x-a[0])*dx+(y-a[1])*dy)/(dx*dx+dy*dy)))
+            distance = math.hypot(a[0]+t*dx-x, a[1]+t*dy-y)
+            if distance < nearest:
+                nearest, segment, fraction = distance, i, t
+        target = self.path[-1]
+        remaining, ahead = 0.0, self.p['path_lookahead']
+        for i in range(segment, len(self.path)-1):
+            a, b = self.path[i], self.path[i+1]
+            t = fraction if i == segment else 0.0
+            length = math.hypot(b[0]-a[0], b[1]-a[1])
+            available = (1-t)*length
+            remaining += available
+            if ahead > 0:
+                if ahead <= available:
+                    t += ahead/length
+                    target = (a[0]+t*(b[0]-a[0]), a[1]+t*(b[1]-a[1]))
+                    ahead = 0.0
+                else:
+                    ahead -= available
+        heading = wrap(math.atan2(target[1]-y, target[0]-x)-yaw)
+        speed = min(self.path_limits[0], self.p['distance_gain']*max(remaining, end_distance))
+        vx = 0.0 if abs(heading) >= math.pi/3 else speed*max(0.0, math.cos(heading))
+        return (vx, clamp(self.p['heading_gain']*heading, self.path_limits[1]))
 
     def on_goal(self, request):
         with self.lock:
@@ -291,7 +337,14 @@ class MotionNode(Node):
                         not -FUTURE_TOLERANCE <= age <= p['navigation_command_timeout']):
                     self.finish(ExecuteMotion.Result.TIMEOUT, 'navigation request timeout')
                     return
-                desired = self.target
+                if not self.path or self.phase == 'REACHED':
+                    self.publish(ZERO)
+                    return
+                self.target = desired = self.follow_path()
+                if self.phase == 'REACHED':
+                    self.publish(ZERO)
+                    self.publish_status()
+                    return
             else:
                 if self.active is None:
                     return
@@ -321,8 +374,14 @@ class MotionNode(Node):
                     self.finish(ExecuteMotion.Result.SUCCEEDED, 'target reached')
                     return
             vx, wz = self.output
-            self.publish((vx+clamp(desired[0]-vx, p['linear_accel']*dt),
-                          wz+clamp(desired[1]-wz, p['angular_accel']*dt)))
+            linear = vx+clamp(desired[0]-vx, p['linear_accel']*dt)
+            if self.mode == MotionStatus.NAVIGATION and desired[0] == 0.0:
+                linear = 0.0
+            angular = wz+clamp(desired[1]-wz, p['angular_accel']*dt)
+            if self.mode == MotionStatus.NAVIGATION:
+                linear = clamp(linear, self.path_limits[0])
+                angular = clamp(angular, self.path_limits[1])
+            self.publish((linear, angular))
 
     def publish_status(self):
         msg = MotionStatus()

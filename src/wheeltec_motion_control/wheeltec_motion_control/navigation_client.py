@@ -9,11 +9,14 @@ import math
 import time
 
 import rclpy
-from geometry_msgs.msg import TwistStamped
+from geometry_msgs.msg import PoseStamped
+from rclpy.action import ActionClient
+from action_msgs.msg import GoalStatus
+from wheeltec_motion_interfaces.action import ExecuteMotion
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
 from std_srvs.srv import SetBool, Trigger
-from wheeltec_motion_interfaces.msg import MotionStatus
+from wheeltec_motion_interfaces.msg import MotionStatus, NavigationPath
 
 
 class ServiceRejected(RuntimeError):
@@ -24,32 +27,23 @@ class ServiceUnavailable(RuntimeError):
     """No request was sent, so there is no uncertain enable to undo."""
 
 
-def decision_velocity(decision, forward_speed=.12, turn_speed=.30):
-    if (not all(math.isfinite(v) for v in (forward_speed, turn_speed)) or
-            forward_speed <= 0 or turn_speed <= 0):
-        raise ValueError('adapter speeds must be finite and positive')
-    mapping = {'forward': (forward_speed, 0.), 'left': (0., turn_speed),
-               'right': (0., -turn_speed), 'reverse': (-forward_speed, 0.)}
-    if decision not in mapping:
-        raise ValueError('use forward/left/right/reverse; stop uses the stop service')
-    return mapping[decision]
-
-
 class NavigationClient(Node):
-    def __init__(self, prefix='/wheeltec_motion', frame='base_link',
+    def __init__(self, prefix='/wheeltec_motion', frame='camera_init',
                  forward_speed=.12, turn_speed=.30, command_timeout=.3,
                  status_timeout=.6):
         super().__init__('wheeltec_navigation_adapter')
-        decision_velocity('forward', forward_speed, turn_speed)
-        if not all(math.isfinite(v) and v > 0 for v in (command_timeout, status_timeout)):
-            raise ValueError('client timeouts must be finite and positive')
+        if not all(math.isfinite(v) and v > 0 for v in (forward_speed, turn_speed, command_timeout, status_timeout)):
+            raise ValueError('speeds and timeouts must be finite and positive')
         self.frame, self.forward_speed, self.turn_speed = frame, forward_speed, turn_speed
         self.command_timeout, self.status_timeout = command_timeout, status_timeout
         self.status = None
         self.status_received = None
         self.session = None
         self.last_decision_stamp_ns = 0
-        self.publisher = self.create_publisher(TwistStamped, prefix+'/navigation/cmd_vel', 1)
+        self.publisher = self.create_publisher(NavigationPath, prefix+'/navigation/path', 1)
+        self.scan_client = ActionClient(self, ExecuteMotion, prefix+'/execute')
+        self.scan_goal_future = self.scan_result_future = None
+        self.scan_deadline = None
         self.mode_client = self.create_client(SetBool, prefix+'/navigation/set_enabled')
         self.stop_client = self.create_client(Trigger, prefix+'/stop')
         self.subscription = self.create_subscription(
@@ -119,8 +113,39 @@ class NavigationClient(Node):
         self.session = None
         return self.call(self.stop_client, Trigger.Request(), timeout)
 
-    def update(self, decision, decision_stamp_ns):
-        """One publish for ONE new decision; never restamp a cached decision."""
+    def start_scan(self, timeout=2.):
+        if not self.scan_client.server_is_ready():
+            raise ServiceUnavailable('scan action server unavailable')
+        goal = ExecuteMotion.Goal()
+        goal.motion_type, goal.target = goal.ROTATE, 2*math.pi
+        goal.max_speed, goal.timeout_sec = self.turn_speed, 45.0
+        self.scan_goal_future = self.scan_client.send_goal_async(goal)
+        self.scan_deadline = time.monotonic()+timeout
+
+    def scan_complete(self):
+        """Poll acceptance/result without blocking the observation loop."""
+        self.poll()
+        if self.scan_result_future is None:
+            if not self.scan_goal_future.done():
+                if time.monotonic() > self.scan_deadline:
+                    raise RuntimeError('scan goal response timeout')
+                return False
+            handle = self.scan_goal_future.result()
+            if not handle.accepted:
+                raise ServiceRejected('scan action rejected')
+            self.scan_result_future = handle.get_result_async()
+            self.scan_deadline = time.monotonic()+47.0
+        if not self.scan_result_future.done():
+            if time.monotonic() > self.scan_deadline:
+                raise RuntimeError('scan result timeout')
+            return False
+        response = self.scan_result_future.result()
+        if response.status != GoalStatus.STATUS_SUCCEEDED or response.result.code != response.result.SUCCEEDED:
+            raise RuntimeError('scan failed: '+response.result.message)
+        return True
+
+    def update(self, points, decision_stamp_ns):
+        """Publish one camera_init path for one newly processed observation."""
         self.poll()
         s = self.status
         if (not self.fresh_status() or self.session is None or s.mode != s.NAVIGATION or
@@ -134,13 +159,22 @@ class NavigationClient(Node):
         if (decision_stamp_ns <= self.last_decision_stamp_ns or
                 not 0 <= age < self.command_timeout):
             raise ValueError('decision must have a new, fresh original ROS timestamp')
-        vx, wz = decision_velocity(decision, self.forward_speed, self.turn_speed)
-        msg = TwistStamped()
-        msg.header.frame_id = self.frame
-        msg.header.stamp.sec, msg.header.stamp.nanosec = divmod(decision_stamp_ns, 10**9)
-        msg.twist.linear.x, msg.twist.angular.z = vx, wz
+        msg = NavigationPath()
+        msg.path.header.frame_id = self.frame
+        msg.path.header.stamp.sec, msg.path.header.stamp.nanosec = divmod(decision_stamp_ns, 10**9)
+        msg.max_linear_speed, msg.max_angular_speed = self.forward_speed, self.turn_speed
+        for x, y, z in points:
+            pose = PoseStamped()
+            pose.header = msg.path.header
+            pose.pose.position.x, pose.pose.position.y, pose.pose.position.z = float(x), float(y), float(z)
+            pose.pose.orientation.w = 1.0
+            msg.path.poses.append(pose)
         self.publisher.publish(msg)
         self.last_decision_stamp_ns = decision_stamp_ns
+
+    def destroy_node(self):
+        self.scan_client.destroy()
+        return super().destroy_node()
 
 
 def main(args=None):

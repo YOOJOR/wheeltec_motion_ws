@@ -13,6 +13,7 @@ uint64 navigation_session
 int64 navigation_enabled_stamp_ns
 # -1 when no accepted request is cached.
 float64 navigation_request_age_sec
+# Path tracker target velocities before acceleration limiting.
 float64 requested_linear_x
 float64 requested_angular_z
 float64 output_linear_x

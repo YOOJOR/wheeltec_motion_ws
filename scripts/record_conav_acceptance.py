@@ -9,11 +9,11 @@ import time
 import numpy as np
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import Twist,TwistStamped
+from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import Image
 from std_msgs.msg import String
-from wheeltec_motion_interfaces.msg import MotionStatus
+from wheeltec_motion_interfaces.msg import MotionStatus,NavigationPath
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]/'conavgpt2_ws/development/Co-NavGPT2'))
 from conavbot.geometry import transform
@@ -53,9 +53,12 @@ def main():
     node.create_subscription(String,'/conavbot/decision',lambda m:decisions.append(json.loads(m.data)),1)
     node.create_subscription(MotionStatus,'/wheeltec_motion/status',lambda m:states.append({'mode':m.mode,'phase':m.phase,'reason':m.reason,'request_age_sec':m.navigation_request_age_sec}),1)
     def navigation(m):
-        stamp=m.header.stamp.sec*10**9+m.header.stamp.nanosec
-        requests.append((time.monotonic(),stamp,(node.get_clock().now().nanoseconds-stamp)/1e9,m.twist.linear.x,m.twist.angular.z))
-    node.create_subscription(TwistStamped,'/wheeltec_motion/navigation/cmd_vel',navigation,1)
+        stamp=m.path.header.stamp.sec*10**9+m.path.header.stamp.nanosec
+        requests.append({'received_monotonic':time.monotonic(),'stamp_ns':stamp,
+                         'age_sec':(node.get_clock().now().nanoseconds-stamp)/1e9,
+                         'points':len(m.path.poses),'max_linear_speed':m.max_linear_speed,
+                         'max_angular_speed':m.max_angular_speed})
+    node.create_subscription(NavigationPath,'/wheeltec_motion/navigation/path',navigation,1)
     start=time.monotonic()
     try:
         while rclpy.ok() and time.monotonic()-start<args.duration:rclpy.spin_once(node,timeout_sec=.05)
@@ -75,7 +78,7 @@ def main():
             'decision_actions':dict(Counter(v.get('action') for v in unique.values())),
             'unique_observations':len(unique),
             'navigation_requests_received':len(requests),
-            'navigation_request_age_max_sec':max((v[2] for v in requests),default=None),
+            'navigation_request_age_max_sec':max((v['age_sec'] for v in requests),default=None),
             'source_age_max_sec':max((v['source_age_sec'] for v in fresh),default=None),
             'processing_max_sec':max((v['processing_sec'] for v in fresh),default=None),
             'odometry_age_max_sec':max((v[3] for v in poses),default=None),
