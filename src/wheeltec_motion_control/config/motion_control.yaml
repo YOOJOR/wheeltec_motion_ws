@@ -24,6 +24,6 @@ wheeltec_motion_controller:
     angle_tolerance: 0.035 # rad
 
     # 超时：源时间超前容许量固定为 0.1 s。
-    navigation_command_timeout: 0.3 # s；导航源时间和接收时间有效期
-    pose_timeout: 0.5 # s；位姿源时间和接收时间有效期
+    navigation_command_timeout: 3.0 # s；导航源时间和接收时间有效期
+    pose_timeout: 3.0 # s；位姿源时间和接收时间有效期
     default_timeout: 45.0 # s；动作请求可覆盖

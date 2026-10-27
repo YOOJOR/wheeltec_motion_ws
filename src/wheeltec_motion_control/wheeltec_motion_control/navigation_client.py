@@ -29,8 +29,8 @@ class ServiceUnavailable(RuntimeError):
 
 class NavigationClient(Node):
     def __init__(self, prefix='/wheeltec_motion', frame='camera_init',
-                 forward_speed=.12, turn_speed=.30, command_timeout=.3,
-                 status_timeout=.6):
+                 forward_speed=.12, turn_speed=.30, command_timeout=3.0,
+                 status_timeout=3.0):
         super().__init__('wheeltec_navigation_adapter')
         if not all(math.isfinite(v) and v > 0 for v in (forward_speed, turn_speed, command_timeout, status_timeout)):
             raise ValueError('speeds and timeouts must be finite and positive')
@@ -84,7 +84,7 @@ class NavigationClient(Node):
         return (0 <= time.monotonic()-self.status_received <= self.status_timeout and
                 -.1 <= age <= self.status_timeout)
 
-    def enable(self, timeout=2.):
+    def enable(self, timeout=5.):
         req = SetBool.Request()
         req.data = True
         started_ns = self.get_clock().now().nanoseconds
@@ -103,17 +103,17 @@ class NavigationClient(Node):
                 return result
         raise RuntimeError('fresh navigation status unavailable after enable')
 
-    def disable(self, timeout=2.):
+    def disable(self, timeout=5.):
         self.session = None
         req = SetBool.Request()
         req.data = False
         return self.call(self.mode_client, req, timeout)
 
-    def stop(self, timeout=2.):
+    def stop(self, timeout=5.):
         self.session = None
         return self.call(self.stop_client, Trigger.Request(), timeout)
 
-    def start_scan(self, timeout=2.):
+    def start_scan(self, timeout=5.):
         if not self.scan_client.server_is_ready():
             raise ServiceUnavailable('scan action server unavailable')
         goal = ExecuteMotion.Goal()

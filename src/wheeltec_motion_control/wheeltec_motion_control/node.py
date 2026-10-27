@@ -36,8 +36,8 @@ DEFAULTS = {
     'path_lookahead': 0.25,
     'distance_tolerance': 0.03,
     'angle_tolerance': 0.035,
-    'pose_timeout': 0.5,
-    'navigation_command_timeout': 0.3,
+    'pose_timeout': 3.0,
+    'navigation_command_timeout': 3.0,
     'default_timeout': 45.0,
 }
 

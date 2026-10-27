@@ -1,0 +1,117 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+  - Class: rviz_common/Views
+    Name: Views
+Visualization Manager:
+  Class: ""
+  Global Options:
+    Background Color: 35; 35; 35
+    Fixed Frame: camera_init
+    Frame Rate: 30
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Enabled: true
+      Cell Size: 1
+    - Class: rviz_default_plugins/Map
+      Name: Static map
+      Enabled: true
+      Topic:
+        Value: /sim/map
+        Durability Policy: Transient Local
+        Reliability Policy: Reliable
+      Alpha: 0.7
+    - Class: rviz_default_plugins/RobotModel
+      Name: Robot
+      Enabled: true
+      Description Source: Topic
+      Description Topic:
+        Value: /robot_description
+        Durability Policy: Transient Local
+    - Class: rviz_default_plugins/Map
+      Name: Agent map
+      Enabled: true
+      Topic:
+        Value: /conavbot/map
+      Alpha: 0.8
+    - Class: rviz_default_plugins/Path
+      Name: Agent path
+      Enabled: true
+      Topic:
+        Value: /conavbot/path
+      Color: 0; 220; 255
+    - Class: rviz_default_plugins/TF
+      Name: TF
+      Enabled: true
+      Show Axes: true
+      Show Names: false
+    - Class: rviz_default_plugins/Path
+      Name: Planned horizon
+      Enabled: true
+      Topic:
+        Value: /sim/planned_path
+      Color: 0; 255; 0
+      Line Style: Lines
+      Line Width: 0.03
+    - Class: rviz_default_plugins/Path
+      Name: Robot trajectory
+      Enabled: true
+      Topic:
+        Value: /sim/trajectory
+      Color: 255; 170; 0
+    - Class: rviz_default_plugins/Marker
+      Name: Navigation status
+      Enabled: true
+      Topic:
+        Value: /sim/status_markers
+    - Class: rviz_default_plugins/MarkerArray
+      Name: Exploration status and goals
+      Enabled: true
+      Topic:
+        Value: /sim/exploration_markers
+        Durability Policy: Transient Local
+        Reliability Policy: Reliable
+        History Policy: Keep Last
+        Depth: 1
+    - Class: rviz_default_plugins/Marker
+      Name: Motor dynamics
+      Enabled: false
+      Topic:
+        Value: /sim/motor_markers
+    - Class: rviz_default_plugins/Image
+      Name: RGB
+      Enabled: true
+      Topic:
+        Value: /camera/d455/raw/d455/color/image_raw
+        Reliability Policy: Best Effort
+    - Class: rviz_default_plugins/Image
+      Name: Depth
+      Enabled: true
+      Topic:
+        Value: /camera/d455/raw/d455/aligned_depth_to_color/image_raw
+        Reliability Policy: Best Effort
+      Normalize Range: true
+      Min Value: 0.4
+      Max Value: 6
+  Tools:
+    - Class: rviz_default_plugins/Interact
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+    - Class: rviz_default_plugins/Measure
+    - Class: rviz_default_plugins/SetGoal
+      Topic:
+        Value: /goal_pose
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 12
+      Pitch: 1.1
+      Yaw: 0.7
+      Focal Point:
+        X: 0
+        Y: 0
+        Z: 0
+Window Geometry:
+  Width: 1400
+  Height: 900
