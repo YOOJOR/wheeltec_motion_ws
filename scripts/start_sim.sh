@@ -74,7 +74,9 @@ case "$sim_command" in
     build_workspace ;;
   compile) build_workspace ;;
   up) start_session ;;
-  goal|explore|stop|estop|status) session "$sim_command" ;;
+  goal|explore|preview|stop|estop|status) session "$sim_command" ;;
+  export)
+    session export ;;
   watch)
     if [[ -t 1 ]]; then
       podman exec -it "$sim_name" bash /sim/ws/scripts/sim/inside.sh python3 /sim/ws/scripts/sim/watch_status.py
@@ -114,7 +116,9 @@ Usage: bash scripts/start_sim.sh COMMAND
   compile   只重编工作区（已有镜像）
   up        启动 Gazebo/RViz，等待点击目标；车辆默认静止
   goal      退出探索，进入 RViz 点目标模式
-  explore   开始一次 60 秒 Agent 探索（会在仿真中运动）
+  explore   开始持续 Agent 探索（会在仿真中运动，stop结束）
+  preview   静止只读采集20秒并导出（不提交运动请求）
+  export    请求当前 Agent 导出阶段，后台写入独立目录
   stop      结束当前任务，正常延迟制动
   estop     清除待执行指令并急停，保留物理制动
   reset     重启场景、时钟及全部任务，回到等待点目标

@@ -25,6 +25,7 @@ class Session(Node):
     def __init__(self):
         super().__init__('conavbot_sim_session')
         self.stop_client = self.create_client(Trigger, '/wheeltec_motion/stop')
+        self.export_client = self.create_client(Trigger, '/conavbot/export_stage')
         self.estop_pub = self.create_publisher(Bool, '/sim/emergency_stop', 1)
         self.processes = {}
         self.logs = []
@@ -58,8 +59,8 @@ class Session(Node):
 
     def finish_task(self, state, reason, exit_code=None):
         report = None
-        path = ROOT / 'agent/report.json'
-        if self.lifecycle['mode'] == 'explore' and path.exists():
+        path = ROOT / 'agent/runs' / self.lifecycle['run_id'] / 'report.json'
+        if self.lifecycle['mode'] in ('explore', 'preview') and path.exists():
             # Only the final report from this process belongs to this task.
             candidate = json.loads(path.read_text())
             if candidate.get('run_id') == self.lifecycle['run_id'] and candidate.get('reason') == 'EXITED':
@@ -82,7 +83,7 @@ class Session(Node):
             return
         os.killpg(process.pid, signal.SIGINT)
         try:
-            process.wait(timeout=8)
+            process.wait(timeout=20 if name == 'task' else 8)
         except subprocess.TimeoutExpired:
             os.killpg(process.pid, signal.SIGTERM)
             try:
@@ -118,10 +119,25 @@ class Session(Node):
 
     def dispatch(self, command):
         if command == 'status':
+            export_file = ROOT / 'agent/runs' / self.lifecycle['run_id'] / 'stages/export_status.json'
+            export_status = json.loads(export_file.read_text()) if export_file.is_file() else None
             return {'mode': self.mode, 'emergency': self.emergency,
                     'processes': {k: 'running' if p.poll() is None else f'exited {p.returncode}'
                                   for k, p in self.processes.items()},
-                    'logs': str(ROOT)}
+                    'logs': str(ROOT), 'export': export_status, 'run_id': self.lifecycle['run_id'],
+                    'results': str(ROOT / 'agent/runs' / self.lifecycle['run_id'])}
+        if command == 'export':
+            task = self.processes.get('task')
+            if self.mode not in ('explore', 'preview') or task is None or task.poll() is not None:
+                return {'error': 'No active Agent; start explore or readonly preview first.'}
+            if not self.export_client.wait_for_service(timeout_sec=2):
+                return {'error': 'Agent export service not ready.'}
+            future = self.export_client.call_async(Trigger.Request())
+            rclpy.spin_until_future_complete(self, future, timeout_sec=3)
+            if not future.done() or future.result() is None:
+                return {'error': 'Export request timed out; inspect export_status.json.'}
+            response = future.result()
+            return {'queued' if response.success else 'error': response.message}
         if command == 'stop':
             return {'stopped': self.stop_task(), 'mode': self.mode}
         if command == 'estop':
@@ -133,7 +149,7 @@ class Session(Node):
             self.stop_task('SESSION_SHUTDOWN')
             self.running = False
             return {'shutdown': True}
-        if command not in ('goal', 'explore'):
+        if command not in ('goal', 'explore', 'preview'):
             return {'error': 'Unknown session command: ' + command}
         if not self.stop_task('MODE_SWITCH'):
             return {'error': 'Motion stop service unavailable; inspect motion/stack logs before starting.'}
@@ -142,11 +158,13 @@ class Session(Node):
             args = self.goal_args
         else:
             args = ['python3', '-m', 'conavbot.runtime', '--config', str(GENERATED / 'agent.yaml'),
-                    '--output', str(ROOT / 'agent'), '--motion', '--duration', '0',
+                    '--output', str(ROOT / 'agent'), '--duration', '0' if command == 'explore' else '20',
+                    '--export-interval', str(self.navigation['export_interval']),
                     '--forward-speed', str(self.navigation['forward_speed']),
                     '--turn-speed', str(self.navigation['turn_speed']), '--map-size-cm', '2400', '--input-stride', '4']
+        if command == 'explore':args.append('--motion')
         self.start_task(command, args)
-        return {'mode': command, 'message': 'Waiting for RViz goal' if command == 'goal' else 'Agent started'}
+        return {'mode': command, 'message': 'Waiting for RViz goal' if command == 'goal' else 'Agent started (motion)' if command == 'explore' else 'Readonly observation capture (20 s)'}
 
 
 def serve():
@@ -201,7 +219,7 @@ def serve():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=['serve', 'status', 'goal', 'explore', 'stop', 'estop', 'shutdown'])
+    parser.add_argument('command', choices=['serve', 'status', 'goal', 'explore', 'preview', 'export', 'stop', 'estop', 'shutdown'])
     args = parser.parse_args()
     if args.command == 'serve':
         serve()

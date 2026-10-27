@@ -7,10 +7,12 @@ import yaml
 from .model import robot_sdf, robot_urdf
 
 
-def box(name, x, y, length, width, height, color):
-    return f'''<model name="{name}"><static>true</static><pose>{x} {y} {height/2} 0 0 0</pose>
-<link name="link"><collision name="collision"><geometry><box><size>{length} {width} {height}</size></box></geometry></collision>
-<visual name="visual"><geometry><box><size>{length} {width} {height}</size></box></geometry><material><ambient>{color} 1</ambient><diffuse>{color} 1</diffuse></material></visual></link></model>'''
+def box(name, x, y, length, width, height, color, z=None, texture=None, collision=True):
+    shape = f'<geometry><box><size>{length} {width} {height}</size></box></geometry>'
+    material = f'<ambient>{color} 1</ambient><diffuse>{color} 1</diffuse>'
+    if texture:
+        material += f'<pbr><metal><albedo_map>{texture}</albedo_map><roughness>0.85</roughness><metalness>0</metalness></metal></pbr>'
+    return f'<model name="{name}"><static>true</static><pose>{x} {y} {height/2 if z is None else z} 0 0 0</pose><link name="link">' + (f'<collision name="collision">{shape}</collision>' if collision else '') + f'<visual name="visual">{shape}<material>{material}</material></visual></link></model>'
 
 
 def generate(config_path, output, motion_template):
@@ -19,11 +21,25 @@ def generate(config_path, output, motion_template):
     output.mkdir(parents=True, exist_ok=True)
     c = yaml.safe_load(config_path.read_text())
     s = c['scene']; w, d, t, h = (s[k] for k in ('width','depth','wall_thickness','wall_height'))
+    assets = config_path.parent.parent / 'assets'
+    textures = {'tile.png', 'plaster.png'} | {part['texture'] for item in s['furniture'] for part in item['parts'] if 'texture' in part}
+    for name in textures:
+        if not (assets/name).is_file():raise FileNotFoundError(assets/name)
     objects = [(-w/2, 0, t, d+t, h), (w/2, 0, t, d+t, h),
-               (0, -d/2, w+t, t, h), (0, d/2, w+t, t, h)] + [tuple(v) for v in s['obstacles']]
-    geometry = box('floor', 0, 0, w+1, d+1, .1, '.55 .55 .55').replace('<pose>0 0 0.05', '<pose>0 0 -0.05')
+               (0, -d/2, w+t, t, h), (0, d/2, w+t, t, h)]
+    geometry = box('floor', 0, 0, w+1, d+1, .1, '1 1 1', z=-.05,
+                   texture=(assets/'tile.png').as_uri())
     for i, obj in enumerate(objects):
-        geometry += box(f'obstacle_{i}', *obj, '.65 .72 .8')
+        geometry += box(f'wall_{i}', *obj, '1 1 1', texture=(assets/'plaster.png').as_uri())
+    for item in s['furniture']:
+        for i, part in enumerate(item['parts']):
+            x,y,l,b,height,z = part['box']
+            solid = part.get('collision', True)
+            geometry += box(f"{item['name']}_{i}", x,y,l,b,height,part['color'],z=z,
+                            texture=(assets/part['texture']).as_uri() if 'texture' in part else None,
+                            collision=solid)
+            if solid:
+                objects.append((x,y,l,b,height))
     robot = ET.fromstring(robot_sdf(c))
     model = robot.find('model') if robot.tag == 'sdf' else robot
     x,y,z,yaw = c['spawn']

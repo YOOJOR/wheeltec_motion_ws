@@ -4,7 +4,7 @@
 
 ## 当前状态
 
-当前阶段：**探索预览版（2026-10-27）**。用户确认本轮策略修正后仿真探索初步正常，两个工作区配套使用；实机完整探索尚未验收。
+当前阶段：**带纹理房间与探索阶段图预览版（2026-10-27）**。用户实际测试后反馈“效果不错，大体可用”，作为本阶段初步可用基线；两个工作区需配套部署。已具备纹理房间、观测彩色地图、关键帧及阶段文件导出，实机完整探索尚未验收。
 
 - 桌面仿真环境已部署，支持 RViz 点目标与 Agent 探索入口、0.20 s 指令延迟及四轮 PID 力矩驱动。已完成编译、静止图形/传感器启动和 Agent 只读建图启动；运动表现由用户交互观察，操作见下方“桌面交互仿真”。
 - Agent 输出前方约1 m路径；普通探索目标使用0.10 m到达容差，物体目标保持原版判定；Navigation 以20 Hz根据实时定位跟踪。motion 不处理地图、障碍判断或局部绕行。
@@ -73,9 +73,14 @@ D455 与 FAST-LIO 独立发布感知和定位。相机由 [start_d455.sh](script
 ### 桌面交互仿真（与实车隔离）
 
 `conavbot_sim` 使用 Podman 中的 Ubuntu 22.04 / ROS Humble / Gazebo Fortress。
-房间为 8×6 m，包含箱体与隔断；四轮麦克纳姆模型按约 0.313 m 轴距、0.355 m 轮距简化。
+房间为 8×6 m，包含瓷砖地面、灰泥墙、红箱、黄柜、木纹桌/书架、蓝椅、绿盆栽和低位彩色墙饰；四轮麦克纳姆模型按约 0.313 m 轴距、0.355 m 轮距简化。
 每轮带被动滚子，驱动使用轮速 PID 输出力矩；指令默认延迟 0.20 s，电机力矩有响应惯性和转速限制。
 这些动力学参数为手动调试起点，未按实车辨识。
+
+场景几何唯一入口为 `simulation.yaml` 的 `scene.furniture.parts`，每个实体部件的盒体同时生成碰撞与静态地图；低位平面墙饰显式 `collision: false`，不进入地图。家具分布在外围，中央隔断两端各留约1.94 m净宽，供0.50 m障碍膨胀后绕行；桌椅采用独立腿、座面和靠背。相机地面高度保持0.30 m，墙饰中心0.43 m，柜/箱/盆栽色块延伸至低视角范围；实际辨识效果需静止RGB图像确认。
+
+纹理位于 `src/conavbot_sim/assets`，全部为本项目离线程序绘制，无外部素材或下载依赖；tile.png为瓷砖、plaster.png为灰泥、wood.png为木纹、art.png为几何装饰画，按本仓库Apache-2.0许可分发，无额外第三方许可或署名要求。资源随包安装，生成SDF使用本地绝对file URI。
+静止核查及阶段导出命令见下方“探索阶段图”；新场景需要重新生成并重启会话。
 
 在本工作区运行：
 
@@ -150,6 +155,72 @@ RViz的 `Exploration status and goals` 显示青色候选点、橙色实际缓�
 容器仅共享本地 X11 与渲染设备，使用独立网络、ROS Domain 71，不挂载底盘串口。
 2026-10-26 用户交互运行后确认探索仿真初步可用。已完成编译、静止图像链路对照和用户手动探索；未做自动运动验收、动力学辨识或实车验收。
 
+### 探索阶段图：启动、导出和查看
+
+更新后重新编译并重启环境（结束现有仿真任务；不启动探索运动）：
+
+```bash
+cd /home/ujiu/workspace/wheeltec-project/ws/wheeltec_motion_ws
+bash scripts/start_sim.sh down
+bash scripts/start_sim.sh compile
+bash scripts/start_sim.sh up
+```
+
+首次没有镜像时，将compile换为 `bash scripts/start_sim.sh build`。等RViz的RGB/深度稳定显示后，可先做20秒静止观测归档：
+
+```bash
+cd /home/ujiu/workspace/wheeltec-project/ws/wheeltec_motion_ws
+bash scripts/start_sim.sh preview
+```
+
+preview停止当前任务，启用只读Agent，不提交扫描或路径运动请求；保留现有底盘位置。首次预热后才开始20秒采集，正常退出保存最终阶段；这只证明当前静止视角，不代表完整探索。对比K图中的颜色/墙饰、彩色图与几何图方向、机器人朝向及K拍摄位置、未知区域；运动轨迹对齐由用户探索后核查。
+
+由用户启动持续探索：
+
+```bash
+cd /home/ujiu/workspace/wheeltec-project/ws/wheeltec_motion_ws
+bash scripts/start_sim.sh explore
+```
+
+另开终端查看状态（status包含run_id、结果目录及导出状态；watch的Ctrl+C仅退出查看）：
+
+```bash
+cd /home/ujiu/workspace/wheeltec-project/ws/wheeltec_motion_ws
+bash scripts/start_sim.sh status
+bash scripts/start_sim.sh watch
+```
+
+Agent运行期间手动导出；成功响应表示后台已排队，完成状态通过status查看：
+
+```bash
+cd /home/ujiu/workspace/wheeltec-project/ws/wheeltec_motion_ws
+bash scripts/start_sim.sh export
+bash scripts/start_sim.sh status
+```
+
+正常停止，先停车再保存最终阶段：
+
+```bash
+cd /home/ujiu/workspace/wheeltec-project/ws/wheeltec_motion_ws
+bash scripts/start_sim.sh stop
+bash scripts/start_sim.sh status
+```
+
+宿主结果位于 `runtime_logs/sim/agent/runs/<run_id>/stages/stage_0001/`，容器内对应 `/sim/runtime/agent/runs/<run_id>/stages/stage_0001/`。查看已有阶段：
+
+```bash
+cd /home/ujiu/workspace/wheeltec-project/ws/wheeltec_motion_ws
+find runtime_logs/sim/agent/runs -name overview.png -print
+```
+
+每阶段包含geometry.png、color.png、keyframes.png、overview.png、Kxxxx.png、metadata.json和map.npz。run目录另存report.json、decisions.jsonl和最终导航map.npz；重启探索不覆盖旧轮次，生成文件都在忽略目录。`stages/export_status.json`显示saved/error/no_observations，未收到真实观测不生成阶段图。详尽格式、轴向/像素公式、颜色高度分层与缓存边界见[Agent README](../conavgpt2_ws/README.md#彩色探索阶段导出)。
+
+自动导出默认15秒；修改 `src/conavbot_sim/config/simulation.yaml` 的 `navigation.export_interval`（0关闭自动导出），重新执行上述down/compile/up。手动及正常结束保存始终保留；只是后台采样与展示，不干预导航地图或控制。旧Agent累计点云不通过IPC复制，当前交付为彩色栅格NPZ，不额外保存无限累计点云。
+
+给多模态AI先上传overview.png，必要时附相关Kxxxx.png及metadata.json：“只描述已观测到的物品外观和空间关系，用K编号指出依据；将未知区和未见表面明确保留。”导出不使用场景对象名称或语义真值，未接在线AI。
+
+2026-10-27用户实际测试后确认本阶段“效果不错，大体可用”，据此归档为初步可用版本。开发侧完成源码/语法、配置及资源引用核查；当时受Podman运行目录只读及宿主依赖缺失限制，未独立复现运行。用户反馈支持整体初步可用，尚无逐项量化的坐标对齐精度、覆盖率、长时间导出开销或实机验收结论。后续优先积累实际探索阶段图并评估AI读图效果，在线AI推理、检测和语义导航仍未接入。
+
 ### 仿真调试结论与实机迁移参考（2026-10-26）
 
 #### 已交付的结构与边界
@@ -219,7 +290,7 @@ RViz的 `Exploration status and goals` 显示青色候选点、橙色实际缓�
 5. 仿真探索已由用户确认初步可用，覆盖完整性、复杂动态障碍与实机运行未验收。不要自动发送实车运动请求。
 6. “终端中文实时状态＋RViz当前目标/前沿＋事件日志”已实现：使用 `watch`，见上方实时状态说明。完成静止显示、实际观测只读Agent字段、Ctrl+C和手动停止状态检查；运动中的显示由用户启动探索观察。
 
-后续需要用户操作时，给出从完整工作目录开始的全部可复制命令，不要求回翻聊天。运行中的故障先看最新 `agent/report.json` 的 `exit_reason` 和 `motion_status_before_stop`；`task.log`为追加文件，末尾附近可能包含旧运行错误，不能混作最新原因。`agent/report.json`和`map.npz`会被后续运行覆盖，重要现场应先归档；诊断目录有独立时间戳和结束时日志副本。
+后续需要用户操作时，给出从完整工作目录开始的全部可复制命令，不要求回翻聊天。运行中的故障先看对应run_id的 `agent/runs/<run_id>/report.json` 的 `exit_reason` 和 `motion_status_before_stop`；`task.log`为追加文件，末尾附近可能包含旧运行错误，不能混作最新原因。每轮report和map位于独立run_id目录，不再被后续运行覆盖；诊断目录有独立时间戳和结束时日志副本。
 
 桌面重新登录后，旧容器可能引用已失效的 `.mutter-Xwaylandauth.*`。使用当前桌面终端重建容器，源码和挂载日志保留：
 
@@ -230,7 +301,7 @@ bash scripts/start_sim.sh compile
 bash scripts/start_sim.sh up
 ```
 
-编译只更新安装文件，运行进程仍需重启；已有会话用 `reset`，无会话用 `up`，避免对不存在的会话执行reset。实机运行时需同时部署两个工作区的对应源码与接口；本轮改动尚未提交或推送。
+编译只更新安装文件，运行进程仍需重启；已有会话用 `reset`，无会话用 `up`，避免对不存在的会话执行reset。实机运行时需同时部署两个工作区的对应源码与接口。本阶段以两个仓库的配套Git提交归档。
 
 两个仓库放在同一父目录，已有目录先检查Git状态和远端，不覆盖修改：
 

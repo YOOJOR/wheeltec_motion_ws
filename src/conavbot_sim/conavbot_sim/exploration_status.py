@@ -17,7 +17,7 @@ from wheeltec_motion_interfaces.msg import MotionStatus
 TERMINAL = {'STOPPED', 'EXITED', 'ERROR'}
 WAITING = {'WAITING', 'NO_NEW_OBSERVATION', 'NEW_OBSERVATION_REQUIRED',
            'NO_TIME_MATCHED_POSE', 'WAITING_FOR_POSE'}
-ZH = {'WAITING': '等待观测', 'INITIAL_SCAN': '启动扫描', 'EXPLORING': '前沿探索',
+ZH = {'READONLY': '静止观测导出', 'WAITING': '等待观测', 'INITIAL_SCAN': '启动扫描', 'EXPLORING': '前沿探索',
       'RANDOM_FALLBACK': '随机目标回退', 'NO_PATH': '无可行路径', 'STOPPED': '已停止',
       'EXITED': '任务退出', 'ERROR': '任务错误', 'STALE': '状态失联', 'IDLE': '空闲',
       'GOAL_NAVIGATION': '目标导航', 'HALTED': '已暂停',
@@ -118,12 +118,12 @@ class ExplorationStatus(Node):
         ages = {name: self.age(now, received) for name, received in
                 [('session', self.session_at), ('agent', self.decision_at), ('motion', self.motion_at)]}
         warmup = (state == 'STARTING' or
-                  (session.get('mode') == 'explore' and self.decision_at is None)) and not terminal
+                  (session.get('mode') in ('explore', 'preview') and self.decision_at is None)) and not terminal
         missing = []
         if session and not terminal:
             missing = [name for name, age in ages.items()
                        if (name == 'session' or not warmup)
-                       and (name != 'agent' or session.get('mode') == 'explore')
+                       and (name != 'agent' or session.get('mode') in ('explore', 'preview'))
                        and (age is None or age > 3.)]
         phase = data.get('phase', 'WAITING')
         reason = data.get('reason', session.get('reason', 'WAITING'))
@@ -137,6 +137,8 @@ class ExplorationStatus(Node):
             phase = reason if reason in {'GOAL_REACHED', 'NO_DESCENT', 'REPEATED_POINT', 'PATH_BLOCKED', 'GOAL_UNREACHABLE'} else 'NO_PATH'
         if session.get('mode') == 'goal' and not data and state == 'RUNNING':
             phase, reason = 'GOAL_NAVIGATION', session.get('reason', 'RUNNING')
+        if session.get('mode') == 'preview' and data and state == 'RUNNING':
+            phase = 'READONLY'
         if terminal:
             phase = state if state in TERMINAL else 'EXITED'
             reason = session.get('reason') if state in TERMINAL else decision.get('exit_reason')

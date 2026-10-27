@@ -110,7 +110,11 @@ def main():
         (output/'summary.json').write_text(json.dumps(dict(stats), indent=2)+'\n')
         runtime = Path('/sim/runtime')
         # Capture the logs that were current at recording end, without changing the session.
-        for relative in ('agent/report.json', 'session.log', 'task.log', 'stack.log', 'generated/motion.yaml'):
+        reports = list((runtime/'agent/runs').glob('*/report.json'))
+        latest = max(reports, key=lambda p:p.stat().st_mtime) if reports else None
+        if latest is not None:
+            shutil.copy2(latest, output/'agent_report.json')
+        for relative in ('session.log', 'task.log', 'stack.log', 'generated/motion.yaml'):
             source = runtime/relative
             if source.is_file():
                 shutil.copy2(source, output/relative.replace('/', '_'))
