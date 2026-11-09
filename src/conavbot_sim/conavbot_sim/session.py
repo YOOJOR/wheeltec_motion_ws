@@ -60,7 +60,7 @@ class Session(Node):
     def finish_task(self, state, reason, exit_code=None):
         report = None
         path = ROOT / 'agent/runs' / self.lifecycle['run_id'] / 'report.json'
-        if self.lifecycle['mode'] in ('explore', 'preview') and path.exists():
+        if self.lifecycle['mode'] in ('explore', 'preview', 'preview-sam') and path.exists():
             # Only the final report from this process belongs to this task.
             candidate = json.loads(path.read_text())
             if candidate.get('run_id') == self.lifecycle['run_id'] and candidate.get('reason') == 'EXITED':
@@ -118,15 +118,25 @@ class Session(Node):
         return stopped
 
     def dispatch(self, command):
+        use_vlm = command == 'explore-vlm'
+        if use_vlm:command = 'explore'
         if command == 'status':
-            export_file = ROOT / 'agent/runs' / self.lifecycle['run_id'] / 'stages/export_status.json'
+            directory = ROOT / 'agent/runs' / self.lifecycle['run_id']
+            export_file = directory / 'stages/export_status.json'
             export_status = json.loads(export_file.read_text()) if export_file.is_file() else None
-            return {'mode': self.mode, 'emergency': self.emergency,
+            status = {'mode': self.mode, 'emergency': self.emergency,
                     'processes': {k: 'running' if p.poll() is None else f'exited {p.returncode}'
                                   for k, p in self.processes.items()},
                     'logs': str(ROOT), 'export': export_status, 'run_id': self.lifecycle['run_id'],
-                    'results': str(ROOT / 'agent/runs' / self.lifecycle['run_id'])}
+                    'results': str(directory)}
+            if self.lifecycle['mode'] == 'preview-sam':
+                report = directory / 'report.json'
+                status['segmentation'] = {'results': str(directory / 'segmentation'),
+                    'report': json.loads(report.read_text()) if report.is_file() else None}
+            return status
         if command == 'export':
+            if self.lifecycle['mode'] == 'preview-sam':
+                return {'error': 'preview-sam saves segmentation frames and does not export maps.'}
             task = self.processes.get('task')
             if self.mode not in ('explore', 'preview') or task is None or task.poll() is not None:
                 return {'error': 'No active Agent; start explore or readonly preview first.'}
@@ -149,13 +159,16 @@ class Session(Node):
             self.stop_task('SESSION_SHUTDOWN')
             self.running = False
             return {'shutdown': True}
-        if command not in ('goal', 'explore', 'preview'):
+        if command not in ('goal', 'explore', 'preview', 'preview-sam'):
             return {'error': 'Unknown session command: ' + command}
         if not self.stop_task('MODE_SWITCH'):
             return {'error': 'Motion stop service unavailable; inspect motion/stack logs before starting.'}
         self.latch(False)
         if command == 'goal':
             args = self.goal_args
+        elif command == 'preview-sam':
+            args = ['python3', '-m', 'conavbot.segmentation_preview',
+                    '--config', str(GENERATED / 'agent.yaml'), '--output', str(ROOT / 'agent')]
         else:
             args = ['python3', '-m', 'conavbot.runtime', '--config', str(GENERATED / 'agent.yaml'),
                     '--output', str(ROOT / 'agent'), '--duration', '0' if command == 'explore' else '20',
@@ -163,7 +176,11 @@ class Session(Node):
                     '--forward-speed', str(self.navigation['forward_speed']),
                     '--turn-speed', str(self.navigation['turn_speed']), '--map-size-cm', '2400', '--input-stride', '4']
         if command == 'explore':args.append('--motion')
+        if use_vlm:args.extend(['--vlm-config',str(ROOT/'vlm.yaml')])
         self.start_task(command, args)
+        if command == 'preview-sam':
+            return {'mode': command, 'run_id': self.lifecycle['run_id'],
+                    'message': 'Stationary refrigerator segmentation started'}
         return {'mode': command, 'message': 'Waiting for RViz goal' if command == 'goal' else 'Agent started (motion)' if command == 'explore' else 'Readonly observation capture (20 s)'}
 
 
@@ -192,7 +209,8 @@ def serve():
             if task is not None and task.poll() is not None:
                 node.get_logger().info(f'{node.mode} process exited with code {task.returncode}; see task.log')
                 node.processes.pop('task')
-                node.stop_motion()
+                if node.mode != 'preview-sam':
+                    node.stop_motion()
                 node.finish_task('EXITED' if task.returncode == 0 else 'ERROR',
                                  'PROCESS_EXITED', task.returncode)
                 node.mode = 'idle'
@@ -219,7 +237,7 @@ def serve():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=['serve', 'status', 'goal', 'explore', 'preview', 'export', 'stop', 'estop', 'shutdown'])
+    parser.add_argument('command', choices=['explore-vlm', 'serve', 'status', 'goal', 'explore', 'preview', 'preview-sam', 'export', 'stop', 'estop', 'shutdown'])
     args = parser.parse_args()
     if args.command == 'serve':
         serve()

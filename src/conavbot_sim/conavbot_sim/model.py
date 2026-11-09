@@ -103,6 +103,9 @@ def robot_sdf(config: dict) -> str:
                         for key, default in motor_defaults)
     pos = c.get('position', [.15, 0, .30-base])
     camera_pose = ' '.join(str(float(v)) for v in pos) + ' 0 0 0'
+    near = c.get('near', .1)
+    rgb_far = c.get('rgb_far', 30.)
+    depth_far = c.get('depth_far', 6.)
     pieces += [f'<link name="camera_link"><pose>{camera_pose}</pose>',
                _inertia(.001, .02, .06, .02),
                '<sensor name="rgbd" type="rgbd_camera"><pose>0 0 0 0 0 0</pose>'
@@ -111,10 +114,9 @@ def robot_sdf(config: dict) -> str:
                f'<horizontal_fov>{c.get("hfov", 79*pi/180)}</horizontal_fov>'
                f'<image><width>{c.get("width", 640)}</width><height>{c.get("height", 480)}</height>'
                '<format>R8G8B8</format></image>'
-               f'<clip><near>{c.get("near", .1)}</near><far>{c.get("far", 6)}</far></clip>'
-               '<depth_camera><clip>'
-               f'<near>{c.get("near", .1)}</near><far>{c.get("far", 6)}</far>'
-               '</clip></depth_camera></camera></sensor></link>',
+               f'<clip><near>{near}</near><far>{rgb_far}</far></clip>'
+               f'<depth_camera><clip><near>{near}</near><far>{depth_far}</far></clip></depth_camera>'
+               '</camera></sensor></link>',
                '<joint name="camera_joint" type="fixed"><parent>base_link</parent><child>camera_link</child></joint>',
                '<plugin filename="libconavbot_motor.so" name="conavbot::MotorSystem">'
                f'{motor_xml}<wheel_radius>{r}</wheel_radius><axle>{p["axle"]}</axle><track>{p["track"]}</track></plugin>',

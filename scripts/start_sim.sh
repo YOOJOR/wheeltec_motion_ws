@@ -14,6 +14,10 @@ session() { inside python3 -m conavbot_sim.session "$1"; }
 
 create_container() {
   if podman container exists "$sim_name"; then
+    if [[ "$(podman inspect -f '{{.Image}}' "$sim_name")" != "$(podman image inspect -f '{{.Id}}' "$sim_image")" ]]; then
+      echo '现有容器仍使用旧镜像。down 会结束当前仿真。关闭会话后重新执行 build，再执行 up。' >&2
+      return 1
+    fi
     if [[ "$(podman inspect -f '{{.State.Running}}' "$sim_name")" != true ]]; then
       podman start "$sim_name" >/dev/null
     fi
@@ -60,7 +64,7 @@ start_session() {
   fi
   inside python3 -m conavbot_sim.scene \
     --config /sim/ws/src/conavbot_sim/config/simulation.yaml --output /sim/runtime/generated
-  podman exec -d "$sim_name" bash /sim/ws/scripts/sim/inside.sh bash -c \
+  podman exec -d -e CONAVBOT_VLM_API_KEY "$sim_name" bash /sim/ws/scripts/sim/inside.sh bash -c \
     'exec python3 -m conavbot_sim.session serve >> /sim/runtime/session.log 2>&1'
   echo 'Gazebo / RViz 正在启动；默认等待 RViz 点目标。日志：runtime_logs/sim/'
 }
@@ -73,10 +77,35 @@ case "$sim_command" in
       -f "$sim_root/scripts/sim/Containerfile" "$sim_root/scripts/sim"
     build_workspace ;;
   compile) build_workspace ;;
+  prepare-sam)
+    create_container
+    inside python3 /sim/ws/scripts/sim/prepare_segmentation_models.py ;;
   up) start_session ;;
-  goal|explore|preview|stop|estop|status) session "$sim_command" ;;
+  goal|explore|explore-vlm|preview|preview-sam|stop|estop|status) session "$sim_command" ;;
   export)
     session export ;;
+  api-status)
+    podman exec -i "$sim_name" bash /sim/ws/scripts/sim/inside.sh python3 - <<'PYNET'
+import json, os
+from pathlib import Path
+from urllib.parse import urlsplit
+import httpx, yaml
+from conavbot.vlm import connection_details
+c=yaml.safe_load(Path('/sim/runtime/vlm.yaml').read_text())
+url=c['base_url'].rstrip('/')+'/models'
+print('API host:',urlsplit(url).hostname)
+for name in ('HTTP_PROXY','HTTPS_PROXY','ALL_PROXY','http_proxy','https_proxy','all_proxy'):
+    if os.environ.get(name):
+        proxy=urlsplit(os.environ[name])
+        print(name,proxy.hostname,proxy.port)
+try:
+    response=httpx.get(url,timeout=10.)
+    print('HTTP status:',response.status_code,'(unauthenticated connectivity probe; no inference or motion)')
+except Exception as exc:
+    print(json.dumps(connection_details(exc),indent=2))
+    raise SystemExit(1)
+PYNET
+    ;;
   watch)
     if [[ -t 1 ]]; then
       podman exec -it "$sim_name" bash /sim/ws/scripts/sim/inside.sh python3 /sim/ws/scripts/sim/watch_status.py
@@ -117,13 +146,17 @@ Usage: bash scripts/start_sim.sh COMMAND
   up        启动 Gazebo/RViz，等待点击目标；车辆默认静止
   goal      退出探索，进入 RViz 点目标模式
   explore   开始持续 Agent 探索（会在仿真中运动，stop结束）
+  explore-vlm  使用runtime_logs/sim/vlm.yaml的VLM前沿选择（会运动）
   preview   静止只读采集20秒并导出（不提交运动请求）
+  prepare-sam  显式下载冰箱检测和分割权重到 runtime_logs/sim/
+  preview-sam  静止识别冰箱，结果在 runtime_logs/sim/agent/runs/<run_id>/segmentation/
   export    请求当前 Agent 导出阶段，后台写入独立目录
   stop      结束当前任务，正常延迟制动
   estop     清除待执行指令并急停，保留物理制动
   reset     重启场景、时钟及全部任务，回到等待点目标
   down      关闭环境
   diagnose [--duration 120] [--label manual]  只读记录卡顿与时间链路
+  api-status  无密钥访问API的/models，诊断连接/DNS/代理/TLS，不发推理或运动请求
   watch     只读实时状态与事件；Ctrl+C 仅退出查看
   status | logs | record | shell
 USAGE

@@ -94,6 +94,15 @@ Visualization Manager:
       Normalize Range: true
       Min Value: 0.4
       Max Value: 6
+    - Class: rviz_default_plugins/Image
+      Name: Refrigerator segmentation
+      Enabled: true
+      Topic:
+        Value: /conavbot/segmentation/image
+        Reliability Policy: Reliable
+        Durability Policy: Transient Local
+        History Policy: Keep Last
+        Depth: 1
   Tools:
     - Class: rviz_default_plugins/Interact
     - Class: rviz_default_plugins/MoveCamera

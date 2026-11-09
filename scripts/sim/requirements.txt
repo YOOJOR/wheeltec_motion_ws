@@ -10,6 +10,7 @@ transforms3d==0.4.2
 omegaconf==2.3.0
 supervision==0.19.0
 ultralytics==8.3.163
+clip @ https://codeload.github.com/openai/CLIP/tar.gz/d05afc436d78f1c48dc0dbf8e5980a9d471f35f6
 timm==1.0.15
 huggingface-hub==0.30.2
 ftfy==6.3.1

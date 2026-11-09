@@ -1,124 +1,101 @@
 # World is camera_init; world origin is the room center, floor z=0.
 world: conavbot_room
-spawn: [-2.0, -2.0, 0.026, 0.0]
+spawn: [-3.0, -2.0, 0.026, 0.0]
 scene:
-  width: 8.0
-  depth: 6.0
-  wall_height: 1.5
+  width: 12.0
+  depth: 10.0
+  wall_height: 2.4
   wall_thickness: 0.12
   map_resolution: 0.05
   # box: [world x, world y, length, width, height, center z], metres
   furniture:
-    - name: red_box
+    - name: interior_walls
       parts:
-        - box: [-1.3, 0.8, 0.7, 0.7, 0.65, 0.325]
-          color: ".85 .08 .04"
-    - name: yellow_cabinet
-      parts:
-        - box: [2.7, -1.7, 0.8, 0.6, 0.9, 0.45]
-          color: ".95 .65 .04"
-    - name: blue_chair
-      parts:
-        - box: [2.7, 1.65, 0.62, 0.62, 0.09, 0.4]
-          color: ".05 .18 .9"
-        - box: [2.7, 1.94, 0.62, 0.08, 0.65, 0.7]
-          color: ".05 .18 .9"
-        - box: [2.46, 1.42, 0.07, 0.07, 0.36, 0.18]
-          color: ".18 .2 .24"
-        - box: [2.46, 1.88, 0.07, 0.07, 0.36, 0.18]
-          color: ".18 .2 .24"
-        - box: [2.94, 1.42, 0.07, 0.07, 0.36, 0.18]
-          color: ".18 .2 .24"
-        - box: [2.94, 1.88, 0.07, 0.07, 0.36, 0.18]
-          color: ".18 .2 .24"
-    - name: table
-      parts:
-        - box: [-2.7, 2, 0.95, 0.65, 0.1, 0.68]
-          color: ".7 .42 .2"
-          texture: wood.png
-        - box: [-3.08, 1.76, 0.09, 0.09, 0.63, 0.315]
-          color: ".35 .2 .1"
-          texture: wood.png
-        - box: [-3.08, 2.24, 0.09, 0.09, 0.63, 0.315]
-          color: ".35 .2 .1"
-          texture: wood.png
-        - box: [-2.32, 1.76, 0.09, 0.09, 0.63, 0.315]
-          color: ".35 .2 .1"
-          texture: wood.png
-        - box: [-2.32, 2.24, 0.09, 0.09, 0.63, 0.315]
-          color: ".35 .2 .1"
-          texture: wood.png
-    - name: bookshelf
-      parts:
-        - box: [3.8, 0, 0.07, 1.05, 1.1, 0.55]
-          color: ".5 .27 .12"
-          texture: wood.png
-        - box: [3.6, -0.49, 0.45, 0.07, 1.1, 0.55]
-          color: ".5 .27 .12"
-          texture: wood.png
-        - box: [3.6, 0.49, 0.45, 0.07, 1.1, 0.55]
-          color: ".5 .27 .12"
-          texture: wood.png
-        - box: [3.6, 0, 0.45, 1.05, 0.06, 0.07]
-          color: ".5 .27 .12"
-          texture: wood.png
-        - box: [3.6, 0, 0.45, 1.05, 0.06, 0.47]
-          color: ".5 .27 .12"
-          texture: wood.png
-        - box: [3.6, 0, 0.45, 1.05, 0.06, 0.87]
-          color: ".5 .27 .12"
-          texture: wood.png
-        - box: [3.6, 0, 0.45, 1.05, 0.06, 1.07]
-          color: ".5 .27 .12"
-          texture: wood.png
-        - box: [3.45, -0.32, 0.12, 0.15, 0.24, 0.32]
-          color: ".8 .1 .05"
-        - box: [3.45, -0.12, 0.12, 0.15, 0.24, 0.32]
-          color: ".05 .15 .8"
-        - box: [3.45, 0.1, 0.12, 0.15, 0.24, 0.32]
-          color: ".9 .7 .05"
-        - box: [3.45, 0.3, 0.12, 0.15, 0.24, 0.32]
-          color: ".1 .6 .2"
-    - name: green_plant
-      parts:
-        - box: [-3.4, 0.2, 0.42, 0.42, 0.3, 0.15]
-          color: ".62 .27 .12"
-          texture: wood.png
-        - box: [-3.4, 0.2, 0.06, 0.06, 0.45, 0.5]
-          color: ".2 .3 .08"
-        - box: [-3.52, 0.2, 0.38, 0.16, 0.1, 0.45]
-          color: ".08 .5 .08"
-        - box: [-3.28, 0.2, 0.38, 0.16, 0.1, 0.57]
-          color: ".08 .5 .08"
-        - box: [-3.4, 0.08, 0.18, 0.38, 0.1, 0.65]
-          color: ".08 .5 .08"
-        - box: [-3.4, 0.32, 0.18, 0.38, 0.1, 0.74]
-          color: ".08 .5 .08"
-        - box: [-3.4, 0.2, 0.24, 0.24, 0.1, 0.84]
-          color: ".08 .5 .08"
-    - name: divider
-      parts:
-        - box: [0.2, 0, 0.16, 2.0, 1.2, 0.6]
-          color: ".85 .85 .8"
+        # Gaps at y=[-3.3,-1.7] and [1.7,3.3].
+        - box: [1, -4.15, 0.12, 1.7, 2.4, 1.2]
+          color: "1 1 1"
           texture: plaster.png
-    - name: low_wall_art
+        - box: [1, 0, 0.12, 3.4, 2.4, 1.2]
+          color: "1 1 1"
+          texture: plaster.png
+        - box: [1, 4.15, 0.12, 1.7, 2.4, 1.2]
+          color: "1 1 1"
+          texture: plaster.png
+        - box: [3.5, 0, 5.0, 0.12, 2.4, 1.2]
+          color: "1 1 1"
+          texture: plaster.png
+    - name: sofa
       parts:
-        - box: [-1.8, 2.932, 0.9, 0.008, 0.44, 0.43]
+        - box: [-4.8, 2.3, 0.9, 2.4, 0.36, 0.18]
+          color: ".17 .34 .45"
+        - box: [-4.8, 2.3, 0.9, 2.0, 0.1, 0.41]
+          color: ".23 .44 .55"
+        - box: [-5.13, 2.3, 0.24, 2.4, 0.49, 0.605]
+          color: ".17 .34 .45"
+        - box: [-4.68, 1.2, 0.66, 0.2, 0.27, 0.495]
+          color: ".17 .34 .45"
+        - box: [-4.68, 3.4, 0.66, 0.2, 0.27, 0.495]
+          color: ".17 .34 .45"
+    - name: coffee_table
+      parts:
+        - box: [-2.8, 2.3, 1.0, 0.7, 0.06, 0.42]
           color: "1 1 1"
-          texture: art.png
-          collision: false
-        - box: [0.8, 2.932, 0.9, 0.008, 0.44, 0.43]
-          color: ".9 .65 .05"
-          texture: art.png
-          collision: false
-        - box: [3.932, -1.0, 0.008, 0.9, 0.44, 0.43]
+          texture: wood.png
+        - box: [-3.21, 2.04, 0.08, 0.08, 0.39, 0.195]
+          color: ".22 .16 .12"
+        - box: [-3.21, 2.56, 0.08, 0.08, 0.39, 0.195]
+          color: ".22 .16 .12"
+        - box: [-2.39, 2.04, 0.08, 0.08, 0.39, 0.195]
+          color: ".22 .16 .12"
+        - box: [-2.39, 2.56, 0.08, 0.08, 0.39, 0.195]
+          color: ".22 .16 .12"
+    - name: television
+      parts:
+        - box: [-0.1, 4.03, 0.6, 1.4, 0.48, 0.24]
           color: "1 1 1"
-          texture: art.png
+          texture: wood.png
+        - box: [-0.1, 4.03, 0.18, 0.38, 0.12, 0.54]
+          color: ".12 .12 .14"
+        - box: [-0.1, 4.03, 0.08, 1.17, 0.62, 0.89]
+          color: ".025 .025 .032"
+    - name: kitchen_counter
+      parts:
+        - box: [3, 4.5, 1.53, 0.63, 0.79, 0.395]
+          color: ".41 .49 .43"
+        - box: [3, 4.5, 1.6, 0.7, 0.06, 0.82]
+          color: ".75 .72 .67"
+    - name: refrigerator
+      parts:
+        - box: [4.8, 4.24, 0.8, 0.67, 1.8, 0.9]
+          color: ".47 .49 .52"
+          collision: true
+        # Door panels face -y. The horizontal gap exposes the darker body.
+        - box: [4.8, 3.87, 0.78, 0.075, 1.16, 0.62]
+          color: ".88 .89 .91"
+          collision: true
+        - box: [4.8, 3.87, 0.78, 0.075, 0.54, 1.497]
+          color: ".88 .89 .91"
+          collision: true
+        - box: [4.51, 3.812, 0.04, 0.06, 0.29, 1.0]
+          color: ".26 .28 .31"
           collision: false
-        - box: [-0.5, -2.932, 0.9, 0.008, 0.44, 0.43]
-          color: ".2 .65 .95"
-          texture: art.png
+        - box: [4.51, 3.812, 0.04, 0.06, 0.21, 1.36]
+          color: ".26 .28 .31"
           collision: false
+    - name: bed
+      parts:
+        - box: [4.3, -3.4, 1.6, 2.0, 0.28, 0.14]
+          color: "1 1 1"
+          texture: wood.png
+        - box: [4.3, -3.36, 1.56, 1.9, 0.2, 0.38]
+          color: ".25 .44 .63"
+        - box: [4.3, -4.35, 1.6, 0.1, 0.6, 0.3]
+          color: "1 1 1"
+          texture: wood.png
+        - box: [3.91, -4.03, 0.58, 0.4, 0.11, 0.535]
+          color: ".91 .9 .86"
+        - box: [4.69, -4.03, 0.58, 0.4, 0.11, 0.535]
+          color: ".91 .9 .86"
 model:
   chassis_length: 0.36
   chassis_width: 0.28
@@ -146,6 +123,14 @@ navigation:
   forward_speed: 0.25
   turn_speed: 0.50
   export_interval: 15.0  # seconds; 0 disables automatic stage export
+segmentation:
+  detector_weights: /sim/runtime/models/yolov8l-world.pt
+  sam_weights: /sim/runtime/models/mobile_sam.pt
+  device: cpu
+  classes: [refrigerator]
+  confidence: 0.25
+  max_detections: 3
+  max_frames: 3
 camera:
   position: [0.15, 0.0, 0.274]
   width: 640
@@ -153,7 +138,8 @@ camera:
   hfov: 1.3788101090755203
   rate: 15.0
   near: 0.1
-  far: 6.0
+  rgb_far: 30.0
+  depth_far: 6.0
 adapter:
   body_from_base_translation: [-0.10718, -0.02237, -0.17788]
   body_from_base_rpy: [0.0, 0.0, 0.0]

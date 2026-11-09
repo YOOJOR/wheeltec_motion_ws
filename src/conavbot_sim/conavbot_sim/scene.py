@@ -76,6 +76,7 @@ def generate(config_path, output, motion_template):
                [0.,-1.,0.,c['camera']['position'][2]],[0.,0.,0.,1.]]
     agent = dict(continuous_exploration=True,base_frame='base_link',base_height=c['model']['base_height'],odom_topic='/Odometry',
         motion_config=str(output/'motion.yaml'),camera=dict(base_from_camera=optical,confirmed=True,source='gazebo_model'))
+    agent['segmentation'] = c['segmentation']
     (output/'agent.yaml').write_text(yaml.safe_dump(agent))
 
 
