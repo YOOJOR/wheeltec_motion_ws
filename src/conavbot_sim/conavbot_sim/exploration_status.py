@@ -20,7 +20,8 @@ WAITING = {'WAITING', 'NO_NEW_OBSERVATION', 'NEW_OBSERVATION_REQUIRED',
 ZH = {'READONLY': '静止观测导出', 'WAITING': '等待观测', 'INITIAL_SCAN': '启动扫描', 'EXPLORING': '前沿探索',
       'RANDOM_FALLBACK': '随机目标回退', 'NO_PATH': '无可行路径', 'STOPPED': '已停止',
       'EXITED': '任务退出', 'ERROR': '任务错误', 'STALE': '状态失联', 'IDLE': '空闲',
-      'GOAL_NAVIGATION': '目标导航', 'HALTED': '已暂停',
+      'GOAL_NAVIGATION': '目标导航', 'TARGET_NAVIGATION': '物体目标导航',
+      'MAPPING_BOOTSTRAP': '首帧建图', 'HALTED': '已暂停',
       'GOAL_REACHED': '已到达当前目标', 'NO_DESCENT': '距离场无下降方向',
       'REPEATED_POINT': '路径点重复', 'PATH_BLOCKED': '路径被障碍阻断',
       'GOAL_UNREACHABLE': '目标与当前区域不连通'}
@@ -118,12 +119,12 @@ class ExplorationStatus(Node):
         ages = {name: self.age(now, received) for name, received in
                 [('session', self.session_at), ('agent', self.decision_at), ('motion', self.motion_at)]}
         warmup = (state == 'STARTING' or
-                  (session.get('mode') in ('explore', 'preview') and self.decision_at is None)) and not terminal
+                  (session.get('mode') in ('explore', 'preview', 'search-object') and self.decision_at is None)) and not terminal
         missing = []
         if session and not terminal:
             missing = [name for name, age in ages.items()
                        if (name == 'session' or not warmup)
-                       and (name != 'agent' or session.get('mode') in ('explore', 'preview'))
+                       and (name != 'agent' or session.get('mode') in ('explore', 'preview', 'search-object'))
                        and (age is None or age > 3.)]
         phase = data.get('phase', 'WAITING')
         reason = data.get('reason', session.get('reason', 'WAITING'))
@@ -172,6 +173,7 @@ class ExplorationStatus(Node):
                    observation_wait_sec=(now-self.waiting_since if waiting and self.waiting_since is not None
                                          else decision.get('observation_wait_sec')),
                    scan_progress_rad=data.get('scan_progress_rad'), scan_target_rad=data.get('scan_target_rad'),
+                   detection_in_progress=not terminal and decision.get('pending_detection_stamp_ns') is not None,
                    waiting=waiting and not terminal, waiting_reason=decision.get('reason') if waiting else None,
                    session_age_sec=ages['session'], decision_age_sec=ages['agent'],
                    motion=dict(phase=motion.phase if motion else None, reason=motion.reason if motion else None,

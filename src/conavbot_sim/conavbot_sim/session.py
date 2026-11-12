@@ -19,6 +19,7 @@ from std_srvs.srv import Trigger
 ROOT = Path('/sim/runtime')
 SOCKET = ROOT / 'session.sock'
 GENERATED = ROOT / 'generated'
+AGENT_MODES = ('explore', 'preview', 'search-object')
 
 
 class Session(Node):
@@ -60,11 +61,13 @@ class Session(Node):
     def finish_task(self, state, reason, exit_code=None):
         report = None
         path = ROOT / 'agent/runs' / self.lifecycle['run_id'] / 'report.json'
-        if self.lifecycle['mode'] in ('explore', 'preview', 'preview-sam') and path.exists():
+        if self.lifecycle['mode'] in (*AGENT_MODES, 'preview-sam') and path.exists():
             # Only the final report from this process belongs to this task.
             candidate = json.loads(path.read_text())
             if candidate.get('run_id') == self.lifecycle['run_id'] and candidate.get('reason') == 'EXITED':
                 report = candidate
+        if self.lifecycle['mode'] == 'search-object' and reason == 'PROCESS_EXITED' and report:
+            reason = report['exit_reason']
         self.lifecycle.update(state=state, reason=reason, exit_code=exit_code, report=report)
         self.publish_status()
 
@@ -118,8 +121,8 @@ class Session(Node):
         return stopped
 
     def dispatch(self, command):
-        use_vlm = command == 'explore-vlm'
-        if use_vlm:command = 'explore'
+        use_vlm = command in ('explore-vlm', 'search-object')
+        if command == 'explore-vlm':command = 'explore'
         if command == 'status':
             directory = ROOT / 'agent/runs' / self.lifecycle['run_id']
             export_file = directory / 'stages/export_status.json'
@@ -128,7 +131,12 @@ class Session(Node):
                     'processes': {k: 'running' if p.poll() is None else f'exited {p.returncode}'
                                   for k, p in self.processes.items()},
                     'logs': str(ROOT), 'export': export_status, 'run_id': self.lifecycle['run_id'],
-                    'results': str(directory)}
+                    'results': str(directory), 'state': self.lifecycle['state'], 'reason': self.lifecycle['reason']}
+            if self.lifecycle['mode'] == 'search-object':
+                report = self.lifecycle['report'] or {}
+                status['object_search'] = {key: report.get(key) for key in (
+                    'target','task_outcome','task_success','target_reached','exit_reason','stop_result')}
+                status['object_search']['fallback_stop'] = self.lifecycle.get('fallback_stop')
             if self.lifecycle['mode'] == 'preview-sam':
                 report = directory / 'report.json'
                 status['segmentation'] = {'results': str(directory / 'segmentation'),
@@ -138,8 +146,8 @@ class Session(Node):
             if self.lifecycle['mode'] == 'preview-sam':
                 return {'error': 'preview-sam saves segmentation frames and does not export maps.'}
             task = self.processes.get('task')
-            if self.mode not in ('explore', 'preview') or task is None or task.poll() is not None:
-                return {'error': 'No active Agent; start explore or readonly preview first.'}
+            if self.mode not in AGENT_MODES or task is None or task.poll() is not None:
+                return {'error': 'No active Agent; start explore, search-object or readonly preview first.'}
             if not self.export_client.wait_for_service(timeout_sec=2):
                 return {'error': 'Agent export service not ready.'}
             future = self.export_client.call_async(Trigger.Request())
@@ -159,7 +167,7 @@ class Session(Node):
             self.stop_task('SESSION_SHUTDOWN')
             self.running = False
             return {'shutdown': True}
-        if command not in ('goal', 'explore', 'preview', 'preview-sam'):
+        if command not in ('goal', *AGENT_MODES, 'preview-sam'):
             return {'error': 'Unknown session command: ' + command}
         if not self.stop_task('MODE_SWITCH'):
             return {'error': 'Motion stop service unavailable; inspect motion/stack logs before starting.'}
@@ -171,16 +179,19 @@ class Session(Node):
                     '--config', str(GENERATED / 'agent.yaml'), '--output', str(ROOT / 'agent')]
         else:
             args = ['python3', '-m', 'conavbot.runtime', '--config', str(GENERATED / 'agent.yaml'),
-                    '--output', str(ROOT / 'agent'), '--duration', '0' if command == 'explore' else '20',
+                    '--output', str(ROOT / 'agent'), '--duration', '20' if command == 'preview' else '0',
                     '--export-interval', str(self.navigation['export_interval']),
                     '--forward-speed', str(self.navigation['forward_speed']),
                     '--turn-speed', str(self.navigation['turn_speed']), '--map-size-cm', '2400', '--input-stride', '4']
-        if command == 'explore':args.append('--motion')
+        if command in ('explore', 'search-object'):args.append('--motion')
+        if command == 'search-object':args.append('--object-search')
         if use_vlm:args.extend(['--vlm-config',str(ROOT/'vlm.yaml')])
         self.start_task(command, args)
         if command == 'preview-sam':
             return {'mode': command, 'run_id': self.lifecycle['run_id'],
                     'message': 'Stationary refrigerator segmentation started'}
+        if command == 'search-object':
+            return {'mode': command, 'run_id': self.lifecycle['run_id'], 'message': 'ObjectNav started (motion)'}
         return {'mode': command, 'message': 'Waiting for RViz goal' if command == 'goal' else 'Agent started (motion)' if command == 'explore' else 'Readonly observation capture (20 s)'}
 
 
@@ -209,7 +220,14 @@ def serve():
             if task is not None and task.poll() is not None:
                 node.get_logger().info(f'{node.mode} process exited with code {task.returncode}; see task.log')
                 node.processes.pop('task')
-                if node.mode != 'preview-sam':
+                if node.mode == 'search-object':
+                    # The runtime has completed its stop transaction before
+                    # exiting normally. A crashed task still needs cleanup.
+                    if task.returncode != 0:
+                        node.lifecycle['fallback_stop'] = node.stop_motion()
+                        if not node.lifecycle['fallback_stop']:
+                            node.latch(True)
+                elif node.mode != 'preview-sam':
                     node.stop_motion()
                 node.finish_task('EXITED' if task.returncode == 0 else 'ERROR',
                                  'PROCESS_EXITED', task.returncode)
@@ -237,7 +255,7 @@ def serve():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=['explore-vlm', 'serve', 'status', 'goal', 'explore', 'preview', 'preview-sam', 'export', 'stop', 'estop', 'shutdown'])
+    parser.add_argument('command', choices=[*AGENT_MODES, 'explore-vlm', 'serve', 'status', 'goal', 'preview-sam', 'export', 'stop', 'estop', 'shutdown'])
     args = parser.parse_args()
     if args.command == 'serve':
         serve()

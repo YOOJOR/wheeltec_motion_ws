@@ -81,7 +81,7 @@ case "$sim_command" in
     create_container
     inside python3 /sim/ws/scripts/sim/prepare_segmentation_models.py ;;
   up) start_session ;;
-  goal|explore|explore-vlm|preview|preview-sam|stop|estop|status) session "$sim_command" ;;
+  goal|explore|explore-vlm|search-object|preview|preview-sam|stop|estop|status) session "$sim_command" ;;
   export)
     session export ;;
   api-status)
@@ -147,6 +147,7 @@ Usage: bash scripts/start_sim.sh COMMAND
   goal      退出探索，进入 RViz 点目标模式
   explore   开始持续 Agent 探索（会在仿真中运动，stop结束）
   explore-vlm  使用runtime_logs/sim/vlm.yaml的VLM前沿选择（会运动）
+  search-object  使用 VLM、YOLO-World、MobileSAM 搜索冰箱，到达后停车（会运动）
   preview   静止只读采集20秒并导出（不提交运动请求）
   prepare-sam  显式下载冰箱检测和分割权重到 runtime_logs/sim/
   preview-sam  静止识别冰箱，结果在 runtime_logs/sim/agent/runs/<run_id>/segmentation/

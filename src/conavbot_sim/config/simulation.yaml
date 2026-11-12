@@ -120,17 +120,24 @@ motor:
   max_linear_speed: 0.30
   max_angular_speed: 0.60
 navigation:
-  forward_speed: 0.25
-  turn_speed: 0.50
+  forward_speed: 0.30
+  turn_speed: 0.60
   export_interval: 15.0  # seconds; 0 disables automatic stage export
 segmentation:
   detector_weights: /sim/runtime/models/yolov8l-world.pt
   sam_weights: /sim/runtime/models/mobile_sam.pt
+  clip_weights: /sim/runtime/home/.cache/clip/ViT-B-32.pt
   device: cpu
   classes: [refrigerator]
   confidence: 0.25
   max_detections: 3
   max_frames: 3
+object_search:
+  target: refrigerator
+  sem_threshold: 0.75
+  min_target_points: 10
+  probe_interval_sec: 4.0
+  inference_timeout_sec: 12.0
 camera:
   position: [0.15, 0.0, 0.274]
   width: 640

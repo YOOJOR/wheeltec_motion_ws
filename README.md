@@ -22,6 +22,7 @@ bash scripts/start_sim.sh up
 | 静止观察并保存地图 | `bash scripts/start_sim.sh preview`，采集约 20 秒 |
 | 静止识别冰箱 | `bash scripts/start_sim.sh preview-sam`，默认采集三帧。首次使用先准备模型 |
 | 开始自主探索 | `bash scripts/start_sim.sh explore`，仿真车会先旋转扫描再开始探索 |
+| 搜索冰箱 | `bash scripts/start_sim.sh search-object`，使用 VLM 前沿探索，三维定位后导航，到达后停车 |
 | 回到 RViz 点目标模式 | `bash scripts/start_sim.sh goal` |
 | 停止当前任务 | `bash scripts/start_sim.sh stop` |
 | 仿真急停 | `bash scripts/start_sim.sh estop`，清空指令队列，车体仍需物理制动 |
@@ -93,6 +94,54 @@ cd /home/ujiu/workspace/wheeltec-project/ws/wheeltec_motion_ws
 bash scripts/start_sim.sh explore-vlm
 ```
 
+### 冰箱目标搜索
+
+沿用上面的 VLM 配置和密钥加载方式。检查 `runtime_logs/sim/vlm.yaml` 的 `target: refrigerator`。同名目标和单类别表在 `simulation.yaml`，对应 `class_id: 0`。这里还配置了本地权重路径、YOLO 0.25、Agent 语义分数大于 0.75、目标掩码内至少 10 个有效三维点。语义阈值为仿真初值，闭环效果待人工验证。[Agent 的官方逻辑与轮式适配](../conavgpt2_ws/README.md#单机器人目标搜索)
+
+已有仿真镜像时用 `compile` 更新。已有会话时，在允许重启该会话后用 `reset` 重新生成配置和加载模块。若需要把新密钥传入会话，按上节使用 `down` 和 `up`。以下命令在未启动会话时运行。权重已准备好时可省略 `prepare-sam`。
+
+```bash
+cd /home/ujiu/workspace/wheeltec-project/ws/wheeltec_motion_ws
+bash scripts/start_sim.sh compile
+bash scripts/start_sim.sh prepare-sam
+bash scripts/start_sim.sh up
+```
+
+等 Gazebo 和 RViz 就绪后，手动启动任务。车辆会执行旋转扫描，后台识别按角度采样的观测。扫描 Action 完成后开始发布导航路径。探索时低频后台识别，导航继续用新观测更新。接受三维目标后切换至物体导航，满足 FMM 到达条件并收到停车应答时结束本轮。
+
+```bash
+cd /home/ujiu/workspace/wheeltec-project/ws/wheeltec_motion_ws
+bash scripts/start_sim.sh search-object
+```
+
+在另一个终端查看状态。用 Ctrl+C 退出查看器。
+
+```bash
+cd /home/ujiu/workspace/wheeltec-project/ws/wheeltec_motion_ws
+bash scripts/start_sim.sh status
+bash scripts/start_sim.sh watch
+```
+
+本轮的原图、框、掩码、三维接受记录和变换在 `segmentation/`。用时间戳与 `decisions.jsonl` 对照。VLM 候选图和回复在 `vlm/`。最终 `report.json` 用 `task_success` 和 `stop_result` 记录任务结果。
+
+```bash
+cd /home/ujiu/workspace/wheeltec-project/ws/wheeltec_motion_ws
+run_id="$(bash scripts/start_sim.sh status | jq -r .run_id)"
+run_dir="runtime_logs/sim/agent/runs/$run_id"
+jq '{exit_reason, task_outcome, target_reached, task_success, stop_result, last_detection}' "$run_dir/report.json"
+jq -c 'select(.target_acquired or (.request_published and .pending_detection_stamp_ns != null)
+  or .goal_kind == "object" or .reason == "EXITED") |
+  {reason, source_stamp_ns, pending_detection_stamp_ns, goal_world, request_published, target_plan, stop_result}' "$run_dir/decisions.jsonl"
+ls "$run_dir/segmentation"
+```
+
+人工观察 `watch` 显示后台识别时前沿路径是否继续更新，再对照冰箱框、掩码、有效深度和点云、`TARGET_ACQUIRED`、物体导航及 `TARGET_REACHED` 后的停车。冰箱框内深度无效且场景其他区域仍有有效深度时，检查 `NO_VALID_TARGET_DEPTH` 和无目标切换。整帧无有效深度报告 `NO_USABLE_DEPTH`。在另一终端可随时结束本轮。
+
+```bash
+cd /home/ujiu/workspace/wheeltec-project/ws/wheeltec_motion_ws
+bash scripts/start_sim.sh stop
+```
+
 ## 仿真调试
 
 先打开一个单独的终端看实时状态。RViz 的 **Exploration status and goals** 同步显示前沿和当前目标。`Ctrl+C` 只退出状态查看器，停车用 `stop`。
@@ -133,7 +182,7 @@ find runtime_logs/sim/agent/runs -name overview.png -print
 
 ### 仿真调试结论与实机迁移参考
 
-用户确认住宅仿真探索初步可用。VLM 复跑 `d4ad9143` 持续约 5 分 22 秒，9 次回复均完整，模型目标均有路径发布和 Agent 到达记录，最终由用户停止。复盘选点效率时按世界坐标对照路径与阶段地图，记录实走距离和新增探索面积。分割仍由独立的静止入口验证。
+用户确认住宅仿真探索初步可用。VLM 复跑 `d4ad9143` 持续约 5 分 22 秒，9 次回复均完整，模型目标均有路径发布和 Agent 到达记录，最终由用户停止。厨房斜侧观察点的冰箱分割已单独验证，闭环搜索运动效果待人工验证。
 
 仿真图像曾因 Fast DDS 共享内存段过小而间歇丢帧。保留仿真专用配置的 **64 MiB** 共享内存段。修改该文件后，有会话时用 `reset`，否则用 `up` 加载。[fastdds.xml](scripts/sim/fastdds.xml)
 

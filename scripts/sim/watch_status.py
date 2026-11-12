@@ -79,7 +79,10 @@ class StatusWatch(Node):
             motion = s['motion']
             velocity_stale = stale or motion['stale']
             state = '状态失联' if disconnected else ('状态过期' if stale else (s['phase_zh'] or '--'))
-            kind = {'frontier': '前沿目标', 'random': '随机回退（继续探索）', 'none': '无目标'}.get(s['goal_kind'], '--')
+            if not stale and s.get('detection_in_progress'):
+                state += ' · 后台识别'
+            kind = {'frontier': '前沿目标', 'random': '随机回退（继续探索）',
+                    'object': '物体目标路径端点', 'none': '无目标'}.get(s['goal_kind'], '--')
             lines = [
                 f"{state} | 模式 {s['mode'] or '--'} | 运行 {s['run_id'][:8] if s['run_id'] else '--'}",
                 f"原因 {s['reason'] or '--'}",
