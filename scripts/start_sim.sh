@@ -92,7 +92,10 @@ from urllib.parse import urlsplit
 import httpx, yaml
 from conavbot.vlm import connection_details
 c=yaml.safe_load(Path('/sim/runtime/vlm.yaml').read_text())
-url=c['base_url'].rstrip('/')+'/models'
+base_url=c.get('base_url') if isinstance(c,dict) else None
+if not isinstance(base_url,str) or not base_url.strip():
+    raise SystemExit('VLM_BASE_URL_REQUIRED: fill in base_url in runtime_logs/sim/vlm.yaml')
+url=base_url.strip().rstrip('/')+'/models'
 print('API host:',urlsplit(url).hostname)
 for name in ('HTTP_PROXY','HTTPS_PROXY','ALL_PROXY','http_proxy','https_proxy','all_proxy'):
     if os.environ.get(name):

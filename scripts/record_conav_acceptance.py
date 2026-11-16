@@ -9,6 +9,7 @@ import time
 import numpy as np
 import rclpy
 from rclpy.node import Node
+from rclpy.signals import SignalHandlerOptions
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import Image
@@ -27,11 +28,11 @@ def main():
     p.add_argument('--output',type=Path,required=True)
     p.add_argument('--sensor-timing',action='store_true',help='Also observe D455 color/depth header arrival times; never store image pixels')
     args=p.parse_args()
-    if not math.isfinite(args.duration) or not 0<args.duration<=120:p.error('duration must be (0,120]')
+    if not math.isfinite(args.duration) or not 0<args.duration<=420:p.error('duration must be (0,420]')
     args.output.parent.mkdir(parents=True,exist_ok=True)
     config=Path(__file__).parents[1]/'src/wheeltec_motion_control/config/motion_control.yaml'
     offset=np.array(yaml.safe_load(config.read_text())['wheeltec_motion_controller']['ros__parameters']['body_from_base_translation'])
-    rclpy.init();node=Node('conav_acceptance_recorder')
+    rclpy.init(signal_handler_options=SignalHandlerOptions.NO);node=Node('conav_acceptance_recorder')
     commands=[];poses=[];decisions=[];states=[];requests=[];sensor_timing=[]
     def sensor(kind,msg):
         now=node.get_clock().now().nanoseconds
@@ -62,6 +63,8 @@ def main():
     start=time.monotonic()
     try:
         while rclpy.ok() and time.monotonic()-start<args.duration:rclpy.spin_once(node,timeout_sec=.05)
+    except KeyboardInterrupt:
+        pass
     finally:
         fresh=[v for v in decisions if 'source_age_sec' in v]
         unique={v['source_stamp_ns']:v for v in fresh}

@@ -38,9 +38,26 @@ bash scripts/start_conav_exploration.sh --start --duration 20
 
 检查本轮 `report.json` 的 `processed`、`exit_reason` 和阶段地图。`processed` 应大于零，地图和坐标方向应与现场一致。只读运行可能在始终等不到配对时耗尽时长，因此要结合 `last_decision` 或 `decisions.jsonl` 判断，不能只看 `duration completed`。日志位置见[实机调试](#实机调试)。
 
+### 实机 VLM 预检
+
+按 Agent 手册填写 `.env`。首次配置或升级已有车载虚拟环境时补装 `python-dotenv`，再复制并编辑实机 VLM YAML。 [API 配置](../conavgpt2_ws/README.md#配置-api)
+
+```bash
+cd /home/wheeltec/workspace/conavgpt2_ws
+.venv/bin/python -m pip install python-dotenv==1.2.4
+cd /home/wheeltec/workspace/wheeltec_motion_ws
+mkdir -p runtime_logs/conav
+cp -n ../conavgpt2_ws/development/Co-NavGPT2/conavbot/vlm.example.yaml runtime_logs/conav/vlm.yaml
+nano runtime_logs/conav/vlm.yaml
+bash scripts/start_conav_exploration.sh --start --duration 45 \
+  --vlm-config "$PWD/runtime_logs/conav/vlm.yaml"
+```
+
+基础栈就绪后执行最后一条命令做只读预检。多个合格前沿才会触发模型请求，在本轮 `vlm/` 查看请求与回复。
+
 ### 有限运动与停车
 
-确认只读结果和外参后，在本次试车已获授权、现场有人观察且能随时停车的条件下运行。下方为保守的几何导航示例，默认先原地扫描一圈，再选前沿并跟踪 FMM 路径。实车有限任务最长 120 秒。试车前按场地明确速度、时间、距起点位移及累计转角预算。时间和转角预算包含启动扫描，位移预算按定位估计的距起点距离计算。示例参数与历史试跑参数各自独立。
+确认只读结果和外参后，在本次试车已获授权、现场有人观察且能随时停车的条件下运行。下方为几何导航示例，默认先原地扫描一圈，再选前沿并跟踪 FMM 路径。几何及纯 VLM 实车任务最长 120 秒，`--object-search` 最长 360 秒。试车前按场地明确速度、时间、距起点位移及累计转角预算。时间和转角预算包含启动扫描，位移预算按定位估计的距起点距离计算。
 
 ```bash
 cd /home/wheeltec/workspace/wheeltec_motion_ws
@@ -91,7 +108,7 @@ python3 scripts/diagnose_pose_delay.py --seconds 15
 
 2026-11-12 和 11-13 均出现过 `STACK READY` 后仍无法将 RGB-D 与定位配对。11-13 的雷达帧末尾年龄约 10–19 ms，`/Odometry` 消息平均年龄 1.386 s，静止建图处理 0 帧。重启受管 FAST-LIO 后，`/Odometry` 平均年龄降至 52 ms，恢复约 10 Hz 输出，重启 Agent 后静止建图恢复。延迟根因待查。遇到同类问题，先结束 Agent 并确认停车，保存时延记录，再通过前文的整栈启停命令重新检查。定位恢复后先重做静止建图。若仍复现，根据当轮日志隔离排查定位。
 
-需要记录轨迹、速度和路径时，使用项目已有的只读记录器。加 `--sensor-timing` 可同时记录图像时戳。记录器放在独立终端，先开始记录再启动任务，`--duration` 按启动和任务时长设置，须大于 0 秒且不超过 120 秒。
+需要记录轨迹、速度和路径时，使用项目已有的只读记录器。加 `--sensor-timing` 可同时记录图像时戳。记录器放在独立终端，先开始记录再启动任务，`--duration` 须大于 0 秒且不超过 420 秒。
 
 ```bash
 cd /home/wheeltec/workspace/wheeltec_motion_ws
@@ -102,7 +119,7 @@ source install/local_setup.bash
   --output "runtime_logs/conav/acceptance/run-$(date +%Y%m%d-%H%M%S).json"
 ```
 
-任务结束时先停车，保持基础栈运行到记录器正常退出，再确认汇总 `.json` 和 `.samples.json` 已落盘。当前记录器在被 SIGINT 提前中断时可能因 ROS 上下文先关闭而归档失败。缺采样时，可从有效规划路径首点还原对应的 FAST-LIO 定位轨迹，精度结论按其数据来源标明。记录器当前不采集整机 CPU、GPU 或内存峰值。
+任务结束时先停车，等记录器结束或按 Ctrl+C 写入结果，再确认汇总 `.json` 和 `.samples.json` 已落盘。缺采样时，可从有效规划路径首点还原对应的 FAST-LIO 定位轨迹，精度结论按其数据来源标明。记录器当前不采集整机 CPU、GPU 或内存峰值。
 
 | 配置 | 用途 |
 | --- | --- |
@@ -124,9 +141,22 @@ source install/local_setup.bash
 
 第二轮使用 `--motion --duration 120 --forward-speed 0.10 --turn-speed 0.30 --max-distance 4.0 --max-rotation 38.0 --map-size-cm 1200 --export-interval 15`。里程按约 1 秒间隔的 FAST-LIO 平面轨迹估算，路径图同时保留采样的 FMM 短路径。前沿到达由 Agent 按 0.10 m 容差判定，任务中车到当前目标的最大瞬时距离约 2.58 m。发布路径的决策处理平均约 80 ms、最高 147 ms，记录到的最大路径请求年龄约 125 ms、最大定位消息年龄约 170 ms。运行期间未连续采集整机资源峰值。
 
-两分钟记录支持首台车基础几何闭环初步可用。更远的固定目标寻路、长时间稳定性、全程跟踪误差、障碍规避和实机语义搜索待验证。Motion 当前未接独立雷达避障输入。
+两分钟记录支持首台车基础几何闭环初步可用。更远的固定目标寻路、长时间稳定性、全程跟踪误差和障碍规避待验证。Motion 当前未接独立雷达避障输入。
 
 2026-11-12 的短测约 45 秒，距起点位移约 0.97 m。首个前沿进入 0.10 m 容差，第二个前沿途中触发转角预算。首个前沿的定位采样点相对首条规划路径的平均平面距离约 3.3 cm、最大约 8.6 cm，使用决策日志还原的定位点。该轮几何处理平均约 46 ms，95% 在约 67 ms 内。
+
+### 实车椅子搜索
+
+2026-11-16 使用同一套 tabs 基础栈、百炼 VLM 和 Orin 本地 YOLO-World/MobileSAM，在两个椅子位置验证探索、检测分割与目标导航。每轮上限 360 秒，速度上限为 0.10 m/s、0.30 rad/s，现场监控下使用 `--time-budget-only`。路径跟踪里程按 FAST-LIO 平面轨迹约 1 秒采样估算。
+
+| 运行 | 观测结果 |
+| --- | --- |
+| 椅子移远 | 约 94 秒到达并停车。累计行驶 4.2 m，Motion 收到 356 个路径请求，1 次 VLM 请求成功。 |
+| 椅子再次换位 | 约 305 秒，累计行驶 19.5 m。8 次 VLM 请求全部成功，Motion 收到 1,705 个路径请求，其中 72 个为物体接近请求。后续 FMM 判定当前位置与目标接近区域不连通，以 `TARGET_UNREACHABLE` 停车，未到达椅子。 |
+
+两轮均生成三维目标，最终状态均读回 `IDLE` 和零速度。此前扫描期间的 GPU 分配失败在 MobileSAM 输入降到 512 后未再出现。另一次近处椅子试跑以 `TARGET_NO_APPROACH_CELLS` 停车。完整跑满 360 秒仍待验证。
+
+本机归档在工作区根目录 `archive/2026-11-16-vlm-chair-search/`。两轮结果分别位于归档的 `object-search/20261116-221720-chair-relocated-awezvS/runs/dc11a91a74e3499db6e729fe4e1b72fc/` 和 `object-search/20261116-222415-chair-new-position-SOJaSP/runs/24d9cc1425394cd7a792867216c380f3/`。运行目录包含 `report.json`、`decisions.jsonl`、`vlm/`、`segmentation/` 和阶段地图，同轮外层目录有独立运动记录、`tegrastats.log` 和停车状态。归档也保留 API 回放、两次早期退出及受管定位日志。原件仍在 Motion 的 `runtime_logs/`。
 
 ### 本机证据
 
@@ -208,7 +238,7 @@ bash scripts/start_sim.sh goal
 
 默认的 `explore` 使用几何前沿。`explore-vlm` 有多个合格前沿时会发送同一份 RGB-D 彩色俯视地图的多张 JPEG，每张标出 R0 和一个完整前沿。模型在 `robot_0` 字段返回编号，并提供 `reason`。只有一个候选时直接规划，无候选时沿用随机回退。选点前停车，回复后用新观测重规划。探索的物体检测关闭，静止分割仍用 `preview-sam`。[Agent 协议与上游差异](../conavgpt2_ws/README.md#vlm-前沿选择)
 
-首次配置时复制模板，然后编辑 `runtime_logs/sim/vlm.yaml` 的 `base_url`、`model` 和 `target`。已有配置时直接编辑。住宅冰箱任务使用 `target: refrigerator`。百炼的 `base_url` 使用业务空间的 OpenAI 兼容地址，末尾为 `/compatible-mode/v1`。密钥环境变量使用模板中的 `CONAVBOT_VLM_API_KEY`。
+先在 Agent 根目录填写 `.env`。首次配置时复制模板，编辑 `runtime_logs/sim/vlm.yaml` 的 `base_url`、`model`、`target`，并核对 `api_key_env` 指向已填写的变量名。已有 YAML 可直接编辑。住宅冰箱任务使用 `target: refrigerator`。百炼的 `base_url` 使用业务空间的 OpenAI 兼容地址，末尾为 `/compatible-mode/v1`。 [API 配置](../conavgpt2_ws/README.md#配置-api)
 
 ```bash
 cd ~/workspace/wheeltec_motion_ws
@@ -216,14 +246,10 @@ mkdir -p runtime_logs/sim
 cp -n ../conavgpt2_ws/development/Co-NavGPT2/conavbot/vlm.example.yaml runtime_logs/sim/vlm.yaml
 ```
 
-用 Bash 执行下方命令。使用 fish 时先输入 `bash`。密钥在终端中输入，`up` 会将其传给新会话。已有会话需要先关闭再启动。
+旧仿真镜像需先运行 `down` 结束旧容器，再运行 `build` 安装新增依赖。之后用现有命令启动。
 
 ```bash
 cd ~/workspace/wheeltec_motion_ws
-read -r -s -p 'VLM API key: ' CONAVBOT_VLM_API_KEY
-printf '\n'
-export CONAVBOT_VLM_API_KEY
-bash scripts/start_sim.sh down
 bash scripts/start_sim.sh up
 ```
 
@@ -238,7 +264,7 @@ bash scripts/start_sim.sh explore-vlm
 
 沿用上面的 VLM 配置和密钥加载方式。检查 `runtime_logs/sim/vlm.yaml` 的 `target: refrigerator`。同名目标和单类别表在 `simulation.yaml`，对应 `class_id: 0`。这里还配置了本地权重路径、YOLO 0.25、Agent 语义分数大于 0.75、目标掩码内至少 10 个有效三维点。语义阈值为仿真初值，闭环效果待人工验证。[Agent 的官方逻辑与轮式适配](../conavgpt2_ws/README.md#单机器人目标搜索)
 
-已有仿真镜像时用 `compile` 更新。已有会话时，在允许重启该会话后用 `reset` 重新生成配置和加载模块。若需要把新密钥传入会话，按上节使用 `down` 和 `up`。以下命令在未启动会话时运行。权重已准备好时可省略 `prepare-sam`。
+仿真镜像准备好后，源码更新可用 `compile`。已有会话时，在允许重启该会话后用 `reset` 重新生成配置和加载模块。修改 `.env` 后，新启动的目标搜索任务会读取该文件。以下命令在未启动会话时运行。权重已准备好时可省略 `prepare-sam`。
 
 ```bash
 cd ~/workspace/wheeltec_motion_ws
